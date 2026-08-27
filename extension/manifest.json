@@ -33,9 +33,9 @@
     }
   ],
   "background": {
-    "scripts": ["src/background.js"]
+    "scripts": ["src/messaging/native-client.js", "src/background.js"]
   },
-  "permissions": [],
+  "permissions": ["nativeMessaging", "storage"],
   "browser_specific_settings": {
     "gecko": {
       "id": "youtube-restrictor@stage-ria.local",
