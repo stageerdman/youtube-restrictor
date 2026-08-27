@@ -47,6 +47,17 @@ Operating instructions for any agent working in this repository. Read
 6. **Plain language in anything Ria or Stage will read.** README sections,
    in-app copy, and commit messages should be understandable without a CS
    background. Code comments can be technical; user-facing text cannot.
+7. **Run this repo's own local setup/install scripts without asking first.**
+   Scripts that exist in this repo specifically to configure the owner's
+   own dev machine for this project — e.g. `scripts/install-native-host.sh`,
+   `scripts/install-policy.sh`, `scripts/build.sh` — are local, scoped to
+   this project, and trivially reversible (re-run them, or delete the file
+   they wrote). Run them proactively as part of finishing a phase instead of
+   pausing to confirm. This does not extend to anything outside that
+   category: destructive commands, git push/force-push, changes to files
+   or system state outside this project's own dev-setup footprint, or
+   anything else covered by the general "check before risky actions"
+   guidance still needs confirmation as normal.
 
 ## Repo layout (expected top-level structure)
 
