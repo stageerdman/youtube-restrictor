@@ -2,7 +2,7 @@
 // No DOM access, no blocking, no logging — just the matching decision.
 (function () {
   function normalize(str) {
-    return (str || "").toLowerCase();
+    return (str || "").toLowerCase().trim();
   }
 
   function check(detection, blocklist) {
@@ -10,11 +10,13 @@
       return { kind: "videoId", value: detection.videoId };
     }
 
-    if (
-      detection.channelId &&
-      blocklist.channelIds.includes(detection.channelId)
-    ) {
-      return { kind: "channelId", value: detection.channelId };
+    if (detection.channelName) {
+      const channelName = normalize(detection.channelName);
+      for (const channel of blocklist.channels) {
+        if (normalize(channel) === channelName) {
+          return { kind: "channel", value: channel };
+        }
+      }
     }
 
     if (detection.title) {

@@ -11,7 +11,7 @@ enum NativeMessage {
             "version": protocolVersion,
             "timestamp": Int(Date().timeIntervalSince1970 * 1000),
             "blocklist": [
-                "channelIds": blocklist.channelIds,
+                "channels": blocklist.channels,
                 "videoIds": blocklist.videoIds,
                 "keywords": blocklist.keywords,
             ],

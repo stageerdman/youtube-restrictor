@@ -24,8 +24,8 @@ final class BlocklistStore: ObservableObject {
 
     // MARK: - Instant (tightening)
 
-    func addChannel(_ rawId: String) {
-        add(rawId, keyPath: \.channelIds)
+    func addChannel(_ rawName: String) {
+        add(rawName, keyPath: \.channels)
     }
 
     func addVideo(_ rawId: String) {
@@ -45,8 +45,8 @@ final class BlocklistStore: ObservableObject {
 
     // MARK: - Delayed + confirmed (loosening)
 
-    func requestRemoveChannel(_ id: String) {
-        friction.requestRemoval(kind: .channelId, value: id)
+    func requestRemoveChannel(_ name: String) {
+        friction.requestRemoval(kind: .channel, value: name)
     }
 
     func requestRemoveVideo(_ id: String) {
@@ -63,8 +63,8 @@ final class BlocklistStore: ObservableObject {
 
     private func applyRemoval(kind: BlocklistEntryKind, value: String) {
         switch kind {
-        case .channelId:
-            blocklist.channelIds.removeAll { $0 == value }
+        case .channel:
+            blocklist.channels.removeAll { $0 == value }
         case .videoId:
             blocklist.videoIds.removeAll { $0 == value }
         case .keyword:

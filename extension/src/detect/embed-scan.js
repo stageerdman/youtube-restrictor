@@ -19,18 +19,34 @@
 
   const seen = new WeakSet();
 
-  function checkIframe(iframe) {
+  async function checkIframe(iframe) {
     if (seen.has(iframe)) return;
     const src = iframe.getAttribute("src");
     if (!src) return;
     const videoId = extractVideoId(src);
     if (!videoId) return;
     seen.add(iframe);
+
+    // Cross-origin iframe — we can't read its title or channel directly,
+    // so ask the background script to resolve them (see
+    // messaging/oembed-resolver.js). Falls back to null on failure
+    // (offline, rate-limited), which still allows videoId-only matches.
+    let metadata = null;
+    try {
+      metadata = await browser.runtime.sendMessage({
+        type: "resolve-embed-metadata",
+        videoId,
+      });
+    } catch (err) {
+      // background unreachable — proceed with videoId-only matching
+    }
+
     window.ytRestrictorReport.reportDetection({
       surface: "embed",
       videoId,
       channelId: null,
-      title: null,
+      channelName: metadata ? metadata.channelName : null,
+      title: metadata ? metadata.title : null,
       url: src,
       pageUrl: location.href,
       element: iframe,

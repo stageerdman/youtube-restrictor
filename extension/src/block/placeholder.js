@@ -5,8 +5,8 @@
     switch (rule.kind) {
       case "videoId":
         return "This video is on your blocklist.";
-      case "channelId":
-        return "This channel is on your blocklist.";
+      case "channel":
+        return `This channel ("${rule.value}") is on your blocklist.`;
       case "keyword":
         return `Title matches blocked keyword "${rule.value}".`;
       default:

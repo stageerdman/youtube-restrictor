@@ -21,11 +21,11 @@ struct ContentView: View {
                 Text("YouTube Restrictor").font(.headline)
 
                 BlocklistSectionView(
-                    title: "Channels", placeholder: "Channel ID",
-                    entries: store.blocklist.channelIds, kind: .channelId,
+                    title: "Channels", placeholder: "Channel name",
+                    entries: store.blocklist.channels, kind: .channel,
                     newValue: $newChannel, isPending: store.isPendingRemoval,
                     onAdd: store.addChannel,
-                    onRemove: { confirmingRemoval = RemovalRequest(kind: .channelId, value: $0) }
+                    onRemove: { confirmingRemoval = RemovalRequest(kind: .channel, value: $0) }
                 )
                 BlocklistSectionView(
                     title: "Videos", placeholder: "Video ID",
@@ -80,7 +80,7 @@ struct ContentView: View {
                 request: request,
                 onConfirm: {
                     switch request.kind {
-                    case .channelId: store.requestRemoveChannel(request.value)
+                    case .channel: store.requestRemoveChannel(request.value)
                     case .videoId: store.requestRemoveVideo(request.value)
                     case .keyword: store.requestRemoveKeyword(request.value)
                     }

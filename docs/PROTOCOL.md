@@ -1,7 +1,7 @@
 # Native Messaging Protocol
 
-Version: `0.1.0` (draft — no native host implementation yet, this is the
-target schema for Phase 3 of `INIT.md`)
+Version: `0.1.0` — implemented by `native-host/`, `extension/src/messaging/`,
+and `menubar-app/`.
 
 All messages are single-line JSON objects exchanged over Firefox's
 [Native Messaging](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging)
@@ -15,27 +15,26 @@ must be ignored (not error) by both sides, to allow forward compatibility.
 ## extension → native host → menu bar app
 
 ### `heartbeat`
-Sent periodically (every ~60s, see `extension/src/messaging/`) while at
-least one tab has an active or recently-active YouTube/embedded player, or
-on a fixed interval regardless of playback state (TBD in Phase 3 — the
-menu bar app only needs to know "extension is alive", not "video is
-playing").
+Sent every 60s regardless of playback state, by
+`extension/src/messaging/native-client.js` — the menu bar app only needs
+to know "extension is alive" (for Phase 5's enforcement check), not
+"video is playing".
 
 ```json
 { "type": "heartbeat", "version": "0.1.0", "timestamp": 1234567890000 }
 ```
 
 ### `match-detected`
-Sent when the blocklist matcher blocks a player, for visibility only (the
-extension enforces the block locally — this is informational, not a
-permission request).
+Not implemented yet (no current consumer) — for visibility only, since
+the extension always enforces the block locally regardless of whether
+the app hears about it. Reserved shape:
 
 ```json
 {
   "type": "match-detected",
   "version": "0.1.0",
   "timestamp": 1234567890000,
-  "matchedRule": { "kind": "channelId", "value": "UCxxxxxxxx" },
+  "matchedRule": { "kind": "channel", "value": "Some Channel" },
   "context": { "url": "https://www.youtube.com/watch?v=...", "embedded": false }
 }
 ```
@@ -53,12 +52,19 @@ rule). Full replace, not a diff.
   "version": "0.1.0",
   "timestamp": 1234567890000,
   "blocklist": {
-    "channelIds": ["UCxxxxxxxx"],
+    "channels": ["Some Channel"],
     "videoIds": ["dQw4w9WgXcQ"],
     "keywords": ["clickbait term"]
   }
 }
 ```
+
+`channels` holds plain channel **display names** (e.g. `"Grian"`), not
+channel IDs — matched case-insensitively. Native youtube.com pages read
+the name straight off the page; embedded players (cross-origin iframes)
+can't expose anything but a video ID, so the extension resolves the name
+via YouTube's public oEmbed endpoint (see
+`extension/src/messaging/oembed-resolver.js`) before matching.
 
 ## Versioning
 

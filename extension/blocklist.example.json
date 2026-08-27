@@ -1,5 +1,5 @@
 {
-  "channelIds": ["UCXXXXXXXXXXXXXXXXXXXXXX"],
+  "channels": ["Example Channel Name"],
   "videoIds": ["dQw4w9WgXcQ"],
   "keywords": ["example clickbait phrase"]
 }

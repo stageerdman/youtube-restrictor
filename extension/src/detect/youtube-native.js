@@ -34,6 +34,27 @@
     return null;
   }
 
+  // Channel *display name* (e.g. "Grian"), not its UCxxxx id — this is
+  // what blocklist "channels" entries are matched against, kept
+  // consistent with embed detection which can only ever get a name (via
+  // oEmbed), never an id. Lives in ytInitialPlayerResponse's
+  // videoDetails.author, not ytInitialData.
+  function extractChannelName() {
+    for (const script of document.querySelectorAll("script")) {
+      const text = script.textContent;
+      if (!text || !text.includes("ytInitialPlayerResponse")) continue;
+      const match = text.match(/"author":"((?:[^"\\]|\\.)*)"/);
+      if (match) {
+        try {
+          return JSON.parse(`"${match[1]}"`);
+        } catch (e) {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
   function extractTitle() {
     return document.title.replace(/ - YouTube$/, "");
   }
@@ -45,6 +66,7 @@
       surface: "native",
       videoId,
       channelId: extractChannelId(),
+      channelName: extractChannelName(),
       title: extractTitle(),
       url: location.href,
     });
