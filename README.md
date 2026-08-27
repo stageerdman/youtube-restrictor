@@ -23,24 +23,27 @@ you want to change, not to fight you.
 
 ## Status
 
-Currently: **Phase 3 — native messaging host.** The extension detects
-YouTube videos, matches them against a blocklist, and blocks matches
-(Phases 1–2). It now also sends a heartbeat to a native messaging host
-(`native-host/`) every 60s and can receive a real blocklist over that
-channel, which takes over from the hardcoded test blocklist the moment
-one arrives. The menu bar app that owns and pushes the real blocklist
-doesn't exist yet (Phase 4) — until it does, `native-host/` just forwards
-to a Unix socket nothing is listening on, so the extension quietly keeps
-using its hardcoded test blocklist. See `native-host/README.md` for how
-to exercise the whole pipe manually with a stand-in test server, and
-`INIT.md` section 3 for the full build order.
+Currently: **Phase 4 — the real menu bar app.** All three components now
+exist and talk to each other end-to-end: the extension detects and
+blocks YouTube playback (Phases 1–2), `native-host/` is the dumb
+stdio↔socket pipe (Phase 3), and `menubar-app/` (Phase 4, new) is the
+real SwiftUI app that owns the blocklist — add/remove UI, JSON
+persistence, and it pushes updates to the extension the moment they
+change. Removing an entry requires retyping it to confirm and then
+waits out an owner-configurable delay (default 30 min, cancellable any
+time before it applies) before it actually stops being enforced —
+adding one is always instant. See `menubar-app/README.md` for how to
+run it and test the full pipe. Not built yet: `launchd` packaging as a
+proper `.app` (Phase 6) and the Firefox enterprise-policy lockdown
+(Phase 7) — see `INIT.md` section 3 for the full build order.
 
 ## Repo layout
 
 - `extension/` — the Firefox WebExtension.
 - `native-host/` — the native-messaging bridge (thin stdio↔socket pipe,
   no blocklist logic — see `native-host/README.md`).
-- `menubar-app/` — the SwiftUI menu bar app (not built yet).
+- `menubar-app/` — the SwiftUI menu bar app that owns the blocklist and
+  the asymmetric-friction rules — see `menubar-app/README.md`.
 - `docs/PROTOCOL.md` — the JSON message format the extension and menu
   bar app use to talk to each other.
 
