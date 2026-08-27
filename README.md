@@ -23,21 +23,25 @@ you want to change, not to fight you.
 
 ## Status
 
-Currently: **Phase 5 — heartbeat enforcement.** All three components
-exist and talk to each other end-to-end: the extension detects and
-blocks YouTube playback, including embeds (Phases 1–2), `native-host/`
-is the dumb stdio↔socket pipe (Phase 3), and `menubar-app/` (Phase 4) is
-the real SwiftUI app that owns the blocklist — add/remove UI, JSON
+Currently: **Phase 6 — launchd packaging.** All three components exist
+and talk to each other end-to-end: the extension detects and blocks
+YouTube playback, including embeds (Phases 1–2), `native-host/` is the
+dumb stdio↔socket pipe (Phase 3), and `menubar-app/` (Phase 4) is the
+real SwiftUI app that owns the blocklist — add/remove UI, JSON
 persistence, pushing updates to the extension the moment they change.
 Removing an entry requires retyping it to confirm and then waits out an
 owner-configurable delay (default 30 min, cancellable any time before it
 applies) before it actually stops being enforced — adding one is always
-instant. New in Phase 5: the app tracks whether the extension is still
-checking in (every 60s) and, if Firefox is running and that goes stale
-for 5 minutes, quits it. See `menubar-app/README.md` for how to run it
-and test the full pipe. Not built yet: `launchd` packaging as a proper
-`.app` (Phase 6) and the Firefox enterprise-policy lockdown (Phase 7) —
-see `INIT.md` section 3 for the full build order.
+instant. The app also tracks whether the extension is still checking in
+(every 60s) and, if Firefox is running and that goes stale for 5
+minutes, quits it (Phase 5). New in Phase 6: `menubar-app` can now be
+packaged into a real `.app` bundle and installed as a `LaunchAgent` —
+starts at login, and relaunches automatically if killed (verified with
+`kill -9`), until the owner deliberately deletes the LaunchAgent file
+and the app bundle by hand. See `menubar-app/README.md` for how to run
+it, install it, and test the full pipe. Not built yet: the Firefox
+enterprise-policy lockdown (Phase 7) — see `INIT.md` section 3 for the
+full build order.
 
 ## Repo layout
 

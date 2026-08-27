@@ -4,10 +4,11 @@ The SwiftUI menu bar app. Owns the blocklist, the asymmetric-friction
 rules, and pushes updates to the extension over a local Unix domain
 socket that `native-host/` connects to — see `docs/PROTOCOL.md`.
 
-Currently a Swift Package (no Xcode project yet — only the Command Line
-Tools were available when this was built, and `swift build`/`swift run`
-is a faster test loop anyway). Phase 6 will wrap this in a proper `.app`
-bundle for `launchd`/`LSUIElement` packaging.
+Built as a Swift Package (no Xcode project — only the Command Line Tools
+were available when this was built, and `swift build`/`swift run` is a
+faster dev loop anyway). For real, "installed" use it's packaged into a
+proper `.app` bundle and run under `launchd` — see "Installing as a
+background service" below.
 
 - `Sources/YTRestrictor/Blocklist.swift` — the data shape (channel
   names, video IDs, keywords), matching `extension/blocklist.example.json`.
@@ -81,3 +82,36 @@ with the extension loaded, then quit Firefox yourself and relaunch it
 without the extension running (or just watch the popover go orange on
 its own once you close the tab/browser). Remember to change
 `staleAfter` back before committing.
+
+## Installing as a background service (Phase 6)
+
+```
+../scripts/install-launch-agent.sh
+```
+
+This packages a real `.app` bundle (`build/YTRestrictor.app`, hand-
+assembled from a `swift build -c release` output — see
+`../scripts/package-menubar-app.sh`) and registers it as a `LaunchAgent`
+at `~/Library/LaunchAgents/com.stage-ria.ytrestrictor-app.plist` with
+`RunAtLoad` (starts at login) and `KeepAlive` (relaunches automatically
+if it's ever killed — crash, force-quit, or even the popover's own Quit
+button). Logs go to
+`~/Library/Application Support/YTRestrictor/logs/{stdout,stderr}.log`.
+
+Verified: `kill -9` on the running process gets it relaunched by
+`launchd` within a couple of seconds, with the socket back up.
+
+**This is intentional, not a bug** — see `CLAUDE.md`'s asymmetric-
+friction principle. The only sanctioned way to fully and permanently
+remove it (you are always the ultimate authority over your own machine):
+
+```
+launchctl unload ~/Library/LaunchAgents/com.stage-ria.ytrestrictor-app.plist
+rm ~/Library/LaunchAgents/com.stage-ria.ytrestrictor-app.plist
+rm -rf build/YTRestrictor.app
+```
+
+While developing, prefer `swift run` (plain process, no relaunch) over
+fighting the installed LaunchAgent — or `launchctl unload` the plist
+first if you need to test against the packaged `.app` without it coming
+back on its own.

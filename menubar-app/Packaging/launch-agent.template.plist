@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.stage-ria.ytrestrictor-app</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__EXECUTABLE_PATH__</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- The whole point of Phase 6, per INIT.md: relaunch if killed
+         (crash, force-quit, or the app's own Quit button — see
+         CLAUDE.md's asymmetric-friction principle. The only sanctioned
+         way to actually stop this permanently is deleting this plist
+         and the app bundle by hand, per INIT.md's owner-is-the-ultimate-
+         authority section.) -->
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>StandardOutPath</key>
+    <string>__STDOUT_PATH__</string>
+    <key>StandardErrorPath</key>
+    <string>__STDERR_PATH__</string>
+</dict>
+</plist>

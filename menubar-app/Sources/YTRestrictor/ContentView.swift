@@ -73,6 +73,9 @@ struct ContentView: View {
                 Button("Quit YouTube Restrictor") {
                     NSApplication.shared.terminate(nil)
                 }
+                Text("If this is installed as a background service (see menubar-app/README.md), quitting relaunches it automatically — that's intentional, not a bug. The only way to fully remove it is deleting the LaunchAgent file and this app by hand.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
             .padding()
         }
