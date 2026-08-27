@@ -19,5 +19,13 @@
   "background": {
     "scripts": ["src/background.js"]
   },
-  "permissions": []
+  "permissions": [],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "youtube-restrictor@stage-ria.local",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  }
 }
