@@ -6,13 +6,29 @@
   "content_scripts": [
     {
       "matches": ["*://*.youtube.com/*", "*://youtu.be/*"],
-      "js": ["src/detect/report.js", "src/detect/youtube-native.js"],
+      "js": [
+        "src/notify/console-log.js",
+        "src/match/test-blocklist.js",
+        "src/match/blocklist.js",
+        "src/block/placeholder.js",
+        "src/block/block.js",
+        "src/controller.js",
+        "src/detect/youtube-native.js"
+      ],
       "run_at": "document_idle"
     },
     {
       "matches": ["<all_urls>"],
       "exclude_matches": ["*://*.youtube.com/*", "*://youtu.be/*"],
-      "js": ["src/detect/report.js", "src/detect/embed-scan.js"],
+      "js": [
+        "src/notify/console-log.js",
+        "src/match/test-blocklist.js",
+        "src/match/blocklist.js",
+        "src/block/placeholder.js",
+        "src/block/block.js",
+        "src/controller.js",
+        "src/detect/embed-scan.js"
+      ],
       "run_at": "document_idle"
     }
   ],

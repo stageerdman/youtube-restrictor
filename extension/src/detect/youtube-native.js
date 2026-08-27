@@ -34,6 +34,10 @@
     return null;
   }
 
+  function extractTitle() {
+    return document.title.replace(/ - YouTube$/, "");
+  }
+
   function detectAndReport() {
     const videoId = extractVideoId(location.href);
     if (!videoId) return;
@@ -41,6 +45,7 @@
       surface: "native",
       videoId,
       channelId: extractChannelId(),
+      title: extractTitle(),
       url: location.href,
     });
   }

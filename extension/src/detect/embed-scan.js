@@ -30,8 +30,10 @@
       surface: "embed",
       videoId,
       channelId: null,
+      title: null,
       url: src,
       pageUrl: location.href,
+      element: iframe,
     });
   }
 
