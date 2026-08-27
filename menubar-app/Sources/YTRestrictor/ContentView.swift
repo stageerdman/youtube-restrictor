@@ -9,6 +9,7 @@ struct RemovalRequest: Identifiable {
 struct ContentView: View {
     @ObservedObject var store: BlocklistStore
     @ObservedObject var friction: FrictionController
+    @ObservedObject var heartbeat: HeartbeatMonitor
 
     @State private var newChannel = ""
     @State private var newVideo = ""
@@ -19,6 +20,7 @@ struct ContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("YouTube Restrictor").font(.headline)
+                HeartbeatStatusView(heartbeat: heartbeat)
 
                 BlocklistSectionView(
                     title: "Channels", placeholder: "Channel name",
@@ -167,5 +169,31 @@ private struct RemovalConfirmationView: View {
         }
         .padding()
         .frame(width: 340)
+    }
+}
+
+private struct HeartbeatStatusView: View {
+    @ObservedObject var heartbeat: HeartbeatMonitor
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(heartbeat.isStale ? Color.orange : Color.green)
+                .frame(width: 8, height: 8)
+            Group {
+                // .relative already renders directional wording
+                // ("5 minutes ago"), so no extra "ago" here.
+                if heartbeat.isStale {
+                    Text("Extension last checked in ")
+                        + Text(heartbeat.lastHeartbeatAt, style: .relative)
+                        + Text(" — Firefox will be closed if it's running.")
+                } else {
+                    Text("Extension connected — last checked in ")
+                        + Text(heartbeat.lastHeartbeatAt, style: .relative)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
     }
 }

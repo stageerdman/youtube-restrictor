@@ -9,8 +9,8 @@ Tools were available when this was built, and `swift build`/`swift run`
 is a faster test loop anyway). Phase 6 will wrap this in a proper `.app`
 bundle for `launchd`/`LSUIElement` packaging.
 
-- `Sources/YTRestrictor/Blocklist.swift` — the data shape (channel IDs,
-  video IDs, keywords), matching `extension/blocklist.example.json`.
+- `Sources/YTRestrictor/Blocklist.swift` — the data shape (channel
+  names, video IDs, keywords), matching `extension/blocklist.example.json`.
 - `AppPaths.swift` — where everything lives on disk, including the
   socket path (must match `native-host/src/socket-path.js`).
 - `BlocklistStore.swift` — the live blocklist + JSON persistence. Adds
@@ -20,10 +20,18 @@ bundle for `launchd`/`LSUIElement` packaging.
   min) and can be cancelled any time before they apply.
 - `MessagingServer.swift` — the Unix-socket server (`Network.framework`)
   that native-host connects to.
+- `HeartbeatMonitor.swift` — tracks when the extension last checked in.
+- `FirefoxEnforcer.swift` — knows how to find and quit Firefox, nothing
+  else.
+- `EnforcementController.swift` — every 30s, if Firefox is running and
+  the heartbeat has gone stale (5 min, not owner-configurable), quits it.
+- `AppCoordinator.swift` — the one place that constructs and wires all
+  of the above together (deliberately not `YTRestrictorApp.init()` —
+  see its doc comment for why that's unsafe with `@StateObject`).
 - `ContentView.swift` — the menu bar popover UI, including the typed
-  "retype the exact value" removal confirmation.
-- `YTRestrictorApp.swift` — entrypoint (`MenuBarExtra`), wires the
-  above together.
+  "retype the exact value" removal confirmation and the heartbeat status
+  line.
+- `YTRestrictorApp.swift` — entrypoint (`MenuBarExtra`).
 
 ## Running it locally
 
@@ -56,3 +64,20 @@ editor. No Dock icon, no window — this is intentional
 To stop: click the app's "Quit YouTube Restrictor" button in the popover
 (there's no Dock icon to quit from, and no menu bar right-click menu —
 just the popover button).
+
+## Heartbeat enforcement (Phase 5)
+
+The popover shows a status line: a green dot + "Extension connected —
+last checked in Xs ago" normally, or an orange dot + a warning once the
+extension hasn't checked in for 5 minutes. If Firefox is running at that
+point, the app quits it (gracefully first, then force-quits ~3s later if
+it's still around — see `FirefoxEnforcer.swift`) and keeps re-checking
+every 30s. This isn't owner-configurable (no stepper for it), matching
+`INIT.md`'s Phase 5 spec.
+
+To test without waiting 5 real minutes: temporarily lower
+`HeartbeatMonitor.staleAfter` (e.g. to 15s), `swift run`, open Firefox
+with the extension loaded, then quit Firefox yourself and relaunch it
+without the extension running (or just watch the popover go orange on
+its own once you close the tab/browser). Remember to change
+`staleAfter` back before committing.

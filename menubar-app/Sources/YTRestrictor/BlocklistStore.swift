@@ -1,40 +1,29 @@
 import Foundation
 
-/// Owns the live, enforced blocklist, its persistence to plain JSON, and
-/// pushing it out over the messaging server. Adding an entry (tightening)
-/// applies and pushes immediately. Removing one (loosening) is delegated
-/// to FrictionController and only actually changes `blocklist` once that
-/// entry's delay has elapsed — see CLAUDE.md's asymmetric-friction
-/// principle.
+/// Owns the live, enforced blocklist and its persistence to plain JSON.
+/// Adding an entry (tightening) applies and pushes immediately. Removing
+/// one (loosening) is delegated to FrictionController and only actually
+/// changes `blocklist` once that entry's delay has elapsed — see
+/// CLAUDE.md's asymmetric-friction principle.
 ///
-/// Owns (rather than being wired to from outside, e.g. from the App
-/// struct's init) its MessagingServer deliberately: this class's own
-/// init is the one place guaranteed to run exactly once against the
-/// real, persistent instance — unlike code in the SwiftUI App struct's
-/// init(), which can end up wiring a throwaway @StateObject instance
-/// that the view graph never actually uses.
+/// Takes its MessagingServer injected rather than creating its own: both
+/// this store and EnforcementController's heartbeat tracking need to
+/// share the single real socket server, and AppCoordinator is the one
+/// place that constructs and wires all of that together — see its doc
+/// comment for why that wiring can't safely live in the SwiftUI App
+/// struct's init() instead.
 final class BlocklistStore: ObservableObject {
     @Published private(set) var blocklist: Blocklist
     let friction: FrictionController
-    private let messagingServer = MessagingServer()
+    private let messagingServer: MessagingServer
 
-    init() {
+    init(messagingServer: MessagingServer) {
+        self.messagingServer = messagingServer
         self.blocklist = Self.load()
         self.friction = FrictionController()
         friction.onApply = { [weak self] kind, value in
             self?.applyRemoval(kind: kind, value: value)
         }
-
-        // Push the current blocklist as soon as a native host connects,
-        // so a freshly (re)launched extension is in sync immediately
-        // rather than waiting for the next edit. Wired before start()
-        // so there's no window where an early connection could arrive
-        // before this callback is set.
-        messagingServer.onClientConnected = { [weak self] in
-            guard let self else { return }
-            self.messagingServer.broadcast(NativeMessage.blocklistUpdate(self.blocklist))
-        }
-        messagingServer.start()
     }
 
     // MARK: - Instant (tightening)

@@ -13,6 +13,11 @@ final class MessagingServer {
     /// Called on the main queue whenever a native-host process connects.
     var onClientConnected: (() -> Void)?
 
+    /// Called on the main queue for every message received from a
+    /// native-host process (heartbeats, etc). Purely a transport
+    /// callback — this class has no opinion on what any message means.
+    var onMessage: (([String: Any]) -> Void)?
+
     func start() {
         AppPaths.ensureSupportDirectoryExists()
         let socketPath = AppPaths.socketPath
@@ -86,8 +91,8 @@ final class MessagingServer {
             let length = Int(headerData.withUnsafeBytes { $0.load(as: UInt32.self) }.littleEndian)
 
             connection.receive(minimumIncompleteLength: length, maximumLength: length) { bodyData, _, _, error in
-                if let bodyData, let json = try? JSONSerialization.jsonObject(with: bodyData) {
-                    print("[messaging] received:", json)
+                if let bodyData, let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any] {
+                    DispatchQueue.main.async { self.onMessage?(json) }
                 }
                 if error == nil {
                     self.receiveLoop(connection)

@@ -16,9 +16,11 @@ must be ignored (not error) by both sides, to allow forward compatibility.
 
 ### `heartbeat`
 Sent every 60s regardless of playback state, by
-`extension/src/messaging/native-client.js` — the menu bar app only needs
-to know "extension is alive" (for Phase 5's enforcement check), not
-"video is playing".
+`extension/src/messaging/native-client.js`. `menubar-app/`'s
+`HeartbeatMonitor` tracks the last one received; if Firefox is running
+and none has arrived for 5 minutes, `EnforcementController` quits
+Firefox (`FirefoxEnforcer`) — the menu bar app only needs to know
+"extension is alive", not "video is playing".
 
 ```json
 { "type": "heartbeat", "version": "0.1.0", "timestamp": 1234567890000 }
