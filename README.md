@@ -23,12 +23,14 @@ you want to change, not to fight you.
 
 ## Status
 
-Currently: **Phase 1 — extension playback detection.** The extension
-detects YouTube videos playing on youtube.com/youtu.be and in embedded
-players on other sites, and logs what it finds to the browser console.
-It does not block anything yet, and there is no menu bar app or
-blocklist enforcement yet — see `INIT.md` section 3 for the full build
-order.
+Currently: **Phase 2 — blocking against a hardcoded test blocklist.**
+The extension detects YouTube videos on youtube.com/youtu.be and in
+embedded players on other sites, logs what it finds, and — if a video/
+channel/title matches a small hardcoded test blocklist
+(`extension/src/match/test-blocklist.js`) — pauses playback and replaces
+the player with a "Blocked by YouTube Restrictor" placeholder. There is
+no real blocklist storage, no menu bar app, and no native messaging yet
+— see `INIT.md` section 3 for the full build order.
 
 ## Repo layout
 
@@ -47,3 +49,8 @@ See the "Trying it" steps in the latest commit/PR description, or:
 3. Open the browser console (`Ctrl+Shift+J` / `Cmd+Shift+J`) and visit a
    YouTube video, or any page with an embedded YouTube player — you
    should see `[YT Restrictor] detected player: ...` log lines.
+4. To see blocking in action, visit
+   [Never Gonna Give You Up](https://www.youtube.com/watch?v=dQw4w9WgXcQ)
+   (or any video whose title contains "shorts") — it's on the hardcoded
+   test blocklist, so it should pause immediately and get replaced with
+   a "Blocked by YouTube Restrictor" placeholder.
