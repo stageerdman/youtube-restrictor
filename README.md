@@ -23,19 +23,23 @@ you want to change, not to fight you.
 
 ## Status
 
-Currently: **Phase 2 — blocking against a hardcoded test blocklist.**
-The extension detects YouTube videos on youtube.com/youtu.be and in
-embedded players on other sites, logs what it finds, and — if a video/
-channel/title matches a small hardcoded test blocklist
-(`extension/src/match/test-blocklist.js`) — pauses playback and replaces
-the player with a "Blocked by YouTube Restrictor" placeholder. There is
-no real blocklist storage, no menu bar app, and no native messaging yet
-— see `INIT.md` section 3 for the full build order.
+Currently: **Phase 3 — native messaging host.** The extension detects
+YouTube videos, matches them against a blocklist, and blocks matches
+(Phases 1–2). It now also sends a heartbeat to a native messaging host
+(`native-host/`) every 60s and can receive a real blocklist over that
+channel, which takes over from the hardcoded test blocklist the moment
+one arrives. The menu bar app that owns and pushes the real blocklist
+doesn't exist yet (Phase 4) — until it does, `native-host/` just forwards
+to a Unix socket nothing is listening on, so the extension quietly keeps
+using its hardcoded test blocklist. See `native-host/README.md` for how
+to exercise the whole pipe manually with a stand-in test server, and
+`INIT.md` section 3 for the full build order.
 
 ## Repo layout
 
 - `extension/` — the Firefox WebExtension.
-- `native-host/` — the small native-messaging bridge (not built yet).
+- `native-host/` — the native-messaging bridge (thin stdio↔socket pipe,
+  no blocklist logic — see `native-host/README.md`).
 - `menubar-app/` — the SwiftUI menu bar app (not built yet).
 - `docs/PROTOCOL.md` — the JSON message format the extension and menu
   bar app use to talk to each other.
