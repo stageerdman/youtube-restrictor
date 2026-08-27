@@ -1,0 +1,23 @@
+{
+  "manifest_version": 2,
+  "name": "YouTube Restrictor",
+  "version": "0.1.0",
+  "description": "Personal self-control tool: detects YouTube playback (native pages and third-party embeds) and blocks it against an owner-defined blocklist.",
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*", "*://youtu.be/*"],
+      "js": ["src/detect/report.js", "src/detect/youtube-native.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "exclude_matches": ["*://*.youtube.com/*", "*://youtu.be/*"],
+      "js": ["src/detect/report.js", "src/detect/embed-scan.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "scripts": ["src/background.js"]
+  },
+  "permissions": []
+}

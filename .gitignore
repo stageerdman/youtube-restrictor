@@ -1,0 +1,35 @@
+# macOS
+.DS_Store
+
+# Environment / secrets — never commit real config
+.env
+.env.*
+!.env.example
+
+# Real blocklist data — only blocklist.example.json is committed
+extension/blocklist.json
+menubar-app/blocklist.json
+*.blocklist.json
+!extension/blocklist.example.json
+
+# Node (native-host, build tooling)
+node_modules/
+npm-debug.log*
+
+# Extension build output
+extension/web-ext-artifacts/
+extension/*.zip
+extension/*.xpi
+
+# Xcode / Swift
+menubar-app/**/DerivedData/
+menubar-app/**/*.xcarchive
+menubar-app/**/build/
+menubar-app/**/.build/
+menubar-app/**/*.xcuserstate
+menubar-app/**/xcuserdata/
+menubar-app/**/.swiftpm/
+
+# Editor
+.vscode/
+.idea/
