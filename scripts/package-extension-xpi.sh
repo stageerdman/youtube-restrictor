@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Packages extension/ into a stable-named .xpi at extension/build/, so
-# the policy's install_url doesn't have to change on every version bump
-# (web-ext build's own output filename bakes in the version number).
+# Packages extension-firefox/ into a stable-named .xpi at
+# extension-firefox/build/, so the policy's install_url doesn't have to
+# change on every version bump (web-ext build's own output filename
+# bakes in the version number). Firefox-only — Chrome's equivalent
+# packaging (signed .crx) is a separate, not-yet-built step.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-EXTENSION_DIR="$REPO_ROOT/extension"
+EXTENSION_DIR="$REPO_ROOT/extension-firefox"
 BUILD_DIR="$EXTENSION_DIR/build"
 XPI_PATH="$BUILD_DIR/youtube-restrictor.xpi"
 

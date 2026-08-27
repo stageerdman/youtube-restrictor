@@ -1,6 +1,7 @@
 "use strict";
-// Firefox Native Messaging stdio framing: each message is a 4-byte
-// little-endian length prefix followed by that many bytes of UTF-8 JSON.
+// Native Messaging stdio framing (same on Firefox and Chrome): each
+// message is a 4-byte little-endian length prefix followed by that many
+// bytes of UTF-8 JSON.
 // This module only knows about that framing — nothing about what the
 // messages mean.
 

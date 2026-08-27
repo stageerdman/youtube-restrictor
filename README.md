@@ -8,13 +8,14 @@ this repo is developed.
 
 ## How it works (eventually)
 
-- A **Firefox extension** watches for YouTube playback and checks it
-  against a blocklist.
-- A **macOS menu bar app** holds that blocklist. You edit it there.
-  Adding a restriction is instant; removing one takes a typed
-  confirmation and a delay, on purpose — that delay is the whole point.
-- The two talk to each other over Firefox's native messaging system, on
-  your machine only. Nothing is sent anywhere else.
+- A **browser extension** — Firefox/Zen and Chrome both supported —
+  watches for YouTube playback and checks it against a blocklist.
+- A **macOS menu bar app** holds that blocklist, the same one either
+  extension reads. You edit it there. Adding a restriction is instant;
+  removing one takes a typed confirmation and a delay, on purpose —
+  that delay is the whole point.
+- Extensions talk to the app over the browser's native messaging
+  system, on your machine only. Nothing is sent anywhere else.
 
 You are always the ultimate authority over your own machine: deleting the
 app, the browser policy file, and the background helper by hand removes
@@ -23,27 +24,42 @@ you want to change, not to fight you.
 
 ## Status
 
-All 8 build phases are done (see `INIT.md` section 3 for the full
-list). The extension detects and blocks YouTube playback, including
-embeds; the menu bar app owns the blocklist with instant-add /
-delayed-remove friction and a heartbeat that quits the browser if the
-extension goes quiet; both are set up to survive restarts and can't be
-casually removed — see "Setup" below for the real install, or
-`docs/HOW-IT-WORKS.md` for the architecture behind all of it.
+All 8 build phases from the original plan are done for **Firefox/Zen**
+(see `INIT.md` section 3 for the full list) — the extension detects and
+blocks YouTube playback including embeds, the menu bar app owns the
+blocklist with instant-add / delayed-remove friction and a heartbeat
+that quits the browser if the extension goes quiet, and both are set up
+to survive restarts and can't be casually removed.
+
+**Chrome support is newer and partial:** detection, blocking, and
+native messaging to the same menu bar app all work (`extension-chrome/`,
+Manifest V3). The force-install lockdown Firefox/Zen has (Phase 7) does
+not exist yet for Chrome — it needs a different mechanism (a signed
+`.crx` + a root-owned policy file) that hasn't been built. Until then,
+Chrome only has a normal, removable "unpacked" install. See "Setup"
+below, or `docs/HOW-IT-WORKS.md` for the architecture behind all of it.
 
 ## Repo layout
 
-- `extension/` — the Firefox WebExtension.
+- `shared/` — the detection/matching/blocking/messaging logic used by
+  *both* browser extensions (copied into each one by
+  `scripts/sync-shared-extension-sources.sh` — always edit here, never
+  in the copies below).
+- `extension-firefox/` — the Firefox/Zen WebExtension (Manifest V2).
+- `extension-chrome/` — the Chrome extension (Manifest V3).
 - `native-host/` — the native-messaging bridge (thin stdio↔socket pipe,
   no blocklist logic — see `native-host/README.md`).
 - `menubar-app/` — the SwiftUI menu bar app that owns the blocklist and
-  the asymmetric-friction rules — see `menubar-app/README.md`.
-- `docs/PROTOCOL.md` — the JSON message format the extension and menu
+  the asymmetric-friction rules, the same one both extensions talk to —
+  see `menubar-app/README.md`.
+- `docs/PROTOCOL.md` — the JSON message format the extensions and menu
   bar app use to talk to each other.
 - `docs/HOW-IT-WORKS.md` — a short architecture overview, for whoever's
   touching the code next.
 
 ## Setup
+
+### Zen Browser (permanent, locked)
 
 This installs everything permanently: the browser extension (locked so
 it can't be accidentally removed), the background app that holds your
@@ -98,6 +114,41 @@ You can block by channel name, specific video, or keyword.
   minutes (e.g. it got disabled somehow), the app will quit Zen for
   you. Just reopen it.
 
+### Chrome (not locked down yet)
+
+Chrome detection, blocking, and talking to the same menu bar app all
+work — but there's no force-install lockdown for Chrome yet (see
+"Status" above), so this is a normal, removable extension install for
+now, closer to the Firefox "For developers" section below than to the
+Zen setup above.
+
+1. Register the native-messaging link (same background helper the Zen
+   setup uses, just a second registration — Chrome and Firefox each
+   keep their own):
+   ```
+   ./scripts/install-native-host-chrome.sh
+   ```
+   This computes the extension's ID from its install path and prints
+   it. Keep that terminal output around for the next step.
+2. Open `chrome://extensions`, turn on **Developer mode** (top right),
+   click **Load unpacked**, and select the `extension-chrome/` folder
+   from this repo.
+3. Check the ID Chrome shows for it against what step 1 printed. If
+   they don't match, re-run step 1 with the real one:
+   `./scripts/install-native-host-chrome.sh <the-real-ID>`.
+4. Make sure the menu bar app is running (see the Zen setup above if
+   you haven't installed it yet — it's the same app, shared by both
+   browsers). Open a YouTube tab in Chrome and check the console
+   (`Cmd+Option+J`) for `[YT Restrictor]` log lines.
+
+Because this isn't locked down, `chrome://extensions` can remove it
+with one click at any time — same as any other unpacked extension. It
+still gets blocklist updates from the same app, just with a Chrome-
+specific quirk: because Chrome suspends the extension's background
+process when idle, a blocklist change you make in the app can take up
+to about a minute to reach an already-open Chrome tab, instead of
+arriving instantly like it does in Zen (see `docs/PROTOCOL.md` for why).
+
 ### Uninstalling completely
 
 You are always in full control of your own machine. To remove
@@ -108,19 +159,23 @@ launchctl unload ~/Library/LaunchAgents/com.stage-ria.ytrestrictor-app.plist
 rm ~/Library/LaunchAgents/com.stage-ria.ytrestrictor-app.plist
 rm -rf menubar-app/build/YTRestrictor.app
 rm /Applications/Zen.app/Contents/Resources/distribution/policies.json
+rm "$HOME/Library/Application Support/Mozilla/NativeMessagingHosts/com.stage_ria.ytrestrictor.json"
+rm "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.stage_ria.ytrestrictor.json"
 ```
 
-Then remove the extension normally from `about:addons` in Zen. There's
-no hidden step and nothing left behind that requires special tools —
-this is a self-control tool, not something designed to resist you.
+Then remove the extension normally from `about:addons` in Zen and/or
+`chrome://extensions` in Chrome. There's no hidden step and nothing
+left behind that requires special tools — this is a self-control tool,
+not something designed to resist you.
 
-## For developers: trying the extension without installing anything
+## For developers: trying the Firefox/Zen extension without installing anything
 
 For quick iteration on extension code, without running any of the
 install scripts above:
 
 1. Open Firefox (or Zen) and go to `about:debugging#/runtime/this-firefox`.
-2. Click **Load Temporary Add-on…** and select `extension/manifest.json`.
+2. Click **Load Temporary Add-on…** and select
+   `extension-firefox/manifest.json`.
 3. Open the browser console (`Ctrl+Shift+J` / `Cmd+Shift+J`) and visit a
    YouTube video, or any page with an embedded YouTube player — you
    should see `[YT Restrictor] detected player: ...` log lines.
@@ -132,5 +187,9 @@ install scripts above:
 
 This temporary install is unlocked (no policy lockdown) and resets when
 Firefox/Zen restarts — it's for development only. For the real,
-persistent setup, use the "Setup" section above. See `scripts/build.sh`
-to build/lint/typecheck all three components at once.
+persistent setup, use the "Setup" section above. (For Chrome, there's
+no separate dev-only flow — "Load unpacked" in the Chrome setup section
+above already is the lightweight iteration path, since Chrome has no
+lockdown yet to route around.) See `scripts/build.sh` to
+build/lint/typecheck everything at once — it also re-syncs `shared/`
+into both extensions first.

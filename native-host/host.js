@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 "use strict";
-// Entrypoint. Firefox spawns this process per native-messaging session
-// and talks to it over stdin/stdout using the framing in
+// Entrypoint. The browser (Firefox/Zen or Chrome) spawns this process
+// per native-messaging session and talks to it over stdin/stdout using
+// the framing in
 // src/stdio-framing.js. This file only wires stdio to the socket bridge
 // — see CLAUDE.md: native-host is a thin, dumb pipe, no blocklist logic.
 

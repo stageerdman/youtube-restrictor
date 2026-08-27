@@ -8,9 +8,20 @@ Operating instructions for any agent working in this repository. Read
 
 1. **Modularity above all.** Three components, three clean boundaries, no
    leaking abstractions between them:
-   - `extension/` — Firefox WebExtension. Knows nothing about how the
-     macOS app is implemented; only speaks the native-messaging JSON
-     protocol defined in `docs/PROTOCOL.md`.
+   - The browser extension — knows nothing about how the macOS app is
+     implemented; only speaks the native-messaging JSON protocol defined
+     in `docs/PROTOCOL.md`. Two browser targets share one detection/
+     matching/blocking codebase in `shared/` (browser-agnostic, no
+     `browser.*`/`chrome.*` calls outside `shared/messaging/` and
+     `shared/runtime-shim.js`), copied into each browser's own
+     self-contained extension directory by
+     `scripts/sync-shared-extension-sources.sh` (browsers can't load
+     files from outside their own extension root, so `shared/` can't be
+     referenced in place — always edit there, never in the copies):
+     - `extension-firefox/` — Manifest V2, targets Zen Browser (see
+       Phase 7 in `INIT.md`).
+     - `extension-chrome/` — Manifest V3 (service worker background,
+       required by MV3 — see `extension-chrome/service-worker.js`).
    - `native-host/` — the native messaging host binary/script. A thin,
      dumb pipe: stdin/stdout framing per Firefox's native messaging spec,
      forwards messages to/from the macOS app. No blocklist logic lives
@@ -68,24 +79,34 @@ Operating instructions for any agent working in this repository. Read
 ├── README.md
 ├── .gitignore
 ├── docs/
-│   └── PROTOCOL.md          # native-messaging JSON message schema, versioned
-├── extension/
-│   ├── manifest.json
-│   ├── src/
-│   │   ├── detect/          # player detection (native + embedded)
-│   │   ├── match/           # blocklist matching logic
-│   │   ├── block/           # playback interruption / placeholder UI
-│   │   ├── messaging/       # native messaging + heartbeat client
-│   │   └── background.js
-│   └── blocklist.example.json
+│   ├── PROTOCOL.md          # native-messaging JSON message schema, versioned
+│   └── HOW-IT-WORKS.md      # architecture overview
+├── shared/                  # detect/match/block/messaging logic, both browsers
+│   ├── detect/              # player detection (native + embedded)
+│   ├── match/                # blocklist matching logic
+│   ├── block/                # playback interruption / placeholder UI
+│   ├── messaging/            # native messaging + heartbeat client
+│   ├── runtime-shim.js       # picks `browser` (Firefox) vs `chrome` (Chrome)
+│   └── background.js
+├── extension-firefox/
+│   ├── manifest.json        # MV2
+│   ├── policies.template.json
+│   └── src/                 # populated from shared/, do not edit directly
+├── extension-chrome/
+│   ├── manifest.json        # MV3
+│   ├── service-worker.js    # MV3 background entry point (imports src/*)
+│   └── src/                 # populated from shared/, do not edit directly
 ├── native-host/
 │   ├── host.(js|swift)
-│   └── manifest/            # NativeMessagingHosts manifest template
+│   └── manifest/            # NativeMessagingHosts manifest templates, per browser
 ├── menubar-app/
 │   └── YTRestrictor/        # SwiftUI Xcode project
 └── scripts/
-    ├── build.sh             # builds everything, see below
-    └── install-policy.sh    # installs/updates Firefox policies.json
+    ├── build.sh                            # builds everything, see below
+    ├── sync-shared-extension-sources.sh    # shared/ -> each extension's src/
+    ├── install-native-host.sh              # Firefox native-messaging registration
+    ├── install-native-host-chrome.sh       # Chrome native-messaging registration
+    └── install-policy.sh                   # installs/updates Zen policies.json
 ```
 
 Adjust as the project evolves, but keep the boundary between the three
@@ -113,35 +134,49 @@ After every change, in this order:
 1. **Build everything relevant to what changed** — don't skip components
    that weren't touched, but do skip a full rebuild of an unrelated
    component if it's slow and clearly unaffected. Concretely:
-   - `extension/`: run the lint/packaging script (`web-ext lint`,
+   - If anything under `shared/` changed, run
+     `scripts/sync-shared-extension-sources.sh` before building either
+     extension — it's the only thing that copies those edits into
+     `extension-firefox/src/` and `extension-chrome/src/`.
+   - `extension-firefox/`: run the lint/packaging script (`web-ext lint`,
      `web-ext build`, or equivalent) to confirm the manifest and code are
      valid.
+   - `extension-chrome/`: validate `manifest.json` and syntax-check the
+     JS (no official MV3 lint CLI in use here — see `scripts/build.sh`
+     for what's actually run).
    - `native-host/`: compile/typecheck it.
    - `menubar-app/`: `xcodebuild` (or `swift build`) the SwiftUI app.
 2. **Report build status explicitly** — state pass/fail per component, and
    paste the actual error output if something failed. Don't say "should
    work" — say what was actually run and what actually happened.
-3. **If the build succeeded and the extension changed at all**, give exact,
-   copy-pasteable next steps to get it running in Firefox, every time,
-   even if it seems repetitive. Default instructions to include:
+3. **If the build succeeded and either extension changed at all**, give
+   exact, copy-pasteable next steps to get it running, every time, even
+   if it seems repetitive. Default instructions to include:
 
-   **For a temporary/dev install (fastest, resets on Firefox restart):**
-   1. Open Firefox and go to `about:debugging#/runtime/this-firefox`
+   **Firefox/Zen — temporary/dev install (fastest, resets on restart):**
+   1. Open Firefox/Zen and go to `about:debugging#/runtime/this-firefox`
    2. Click "Load Temporary Add-on…"
-   3. Select `extension/manifest.json` from this repo
+   3. Select `extension-firefox/manifest.json` from this repo
    4. Confirm the extension appears in the list with no errors
 
+   **Chrome — unpacked install (resets on browser restart unless pinned):**
+   1. Open `chrome://extensions`, enable "Developer mode" (top right)
+   2. Click "Load unpacked" and select the `extension-chrome/` folder
+   3. Confirm it appears in the list with no errors, and note the ID
+      shown — needed by `scripts/install-native-host-chrome.sh`
+
    **If the manifest, permissions, or native messaging host name changed**
-   (temporary install won't pick these up cleanly — say so explicitly and
-   add):
-   5. Remove the previously loaded temporary add-on first (click "Remove")
+   (temporary/unpacked install won't pick these up cleanly — say so
+   explicitly and add):
+   5. Remove the previously loaded temporary/unpacked extension first
    6. If the native messaging host manifest changed, re-run
-      `scripts/install-native-host.sh` (or the current equivalent) before
-      reloading the extension
+      `scripts/install-native-host.sh` (Firefox) and/or
+      `scripts/install-native-host-chrome.sh` (Chrome) before reloading
 
    **If this is a signed/permanent install milestone**, give the actual
-   packaging + `about:addons` install steps for that specific point in the
-   project instead of the temporary-install steps above.
+   packaging + `about:addons`/`chrome://extensions` install steps for
+   that specific point in the project instead of the temporary-install
+   steps above.
 4. **If the menu bar app changed**, give exact steps to rebuild/relaunch it
    locally (e.g. "quit any running instance from the menu bar icon first,
    then run `scripts/build.sh` and reopen `menubar-app/build/YTRestrictor.app`"),

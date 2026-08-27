@@ -4,7 +4,7 @@
 (function () {
   async function getActiveBlocklist() {
     try {
-      const stored = await browser.storage.local.get("blocklist");
+      const stored = await ytRestrictorRuntime.storage.local.get("blocklist");
       if (stored && stored.blocklist) return stored.blocklist;
     } catch (err) {
       // storage unavailable — fall back to the hardcoded test blocklist

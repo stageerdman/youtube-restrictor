@@ -38,7 +38,7 @@
     }
   }
 
-  browser.runtime.onMessage.addListener((message) => {
+  ytRestrictorRuntime.runtime.onMessage.addListener((message) => {
     if (message && message.type === "resolve-embed-metadata") {
       return resolve(message.videoId);
     }

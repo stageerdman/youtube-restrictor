@@ -11,7 +11,7 @@ proper `.app` bundle and run under `launchd` — see "Installing as a
 background service" below.
 
 - `Sources/YTRestrictor/Blocklist.swift` — the data shape (channel
-  names, video IDs, keywords), matching `extension/blocklist.example.json`.
+  names, video IDs, keywords), matching `shared/blocklist.example.json`.
 - `AppPaths.swift` — where everything lives on disk, including the
   socket path (must match `native-host/src/socket-path.js`).
 - `BlocklistStore.swift` — the live blocklist + JSON persistence. Adds

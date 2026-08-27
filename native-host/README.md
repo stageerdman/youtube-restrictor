@@ -1,20 +1,27 @@
 # native-host
 
-A thin, dumb pipe between the Firefox extension and the macOS menu bar
-app (Phase 4, not built yet). It has no blocklist logic — see
-`CLAUDE.md`.
+A thin, dumb pipe between a browser extension (Firefox/Zen or Chrome)
+and the macOS menu bar app. It has no blocklist logic — see
+`CLAUDE.md`. The same `host.js` serves both browsers; only the
+registration manifest differs, since Firefox and Chrome each keep their
+own separate `NativeMessagingHosts` directory and neither reads the
+other's.
 
-- `host.js` — entrypoint. Firefox spawns this per native-messaging
+- `host.js` — entrypoint. The browser spawns this per native-messaging
   session and talks to it over stdin/stdout.
-- `src/stdio-framing.js` — reads/writes Firefox's native-messaging wire
-  format (4-byte length prefix + UTF-8 JSON).
+- `src/stdio-framing.js` — reads/writes the native-messaging wire format
+  (4-byte length prefix + UTF-8 JSON) common to both Firefox and Chrome.
 - `src/socket-bridge.js` — forwards every message to/from a local Unix
-  domain socket, where the menu bar app will listen once it exists.
-  Retries the connection if the app isn't running.
+  domain socket, where the menu bar app listens. Retries the connection
+  if the app isn't running.
 - `src/socket-path.js` — the one place that defines the socket path
   (`~/Library/Application Support/YTRestrictor/host.sock`).
 - `manifest/host-manifest.template.json` + `scripts/install-native-host.sh`
   — registers this host with Firefox.
+- `manifest/host-manifest-chrome.template.json` +
+  `scripts/install-native-host-chrome.sh` — registers this host with
+  Chrome (needs the extension's ID, computed from its install path by
+  the script — see the script's header comment for the caveat on that).
 
 ## Testing this in isolation (menu bar app doesn't exist yet)
 

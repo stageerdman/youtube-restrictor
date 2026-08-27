@@ -33,7 +33,7 @@
     // (offline, rate-limited), which still allows videoId-only matches.
     let metadata = null;
     try {
-      metadata = await browser.runtime.sendMessage({
+      metadata = await ytRestrictorRuntime.runtime.sendMessage({
         type: "resolve-embed-metadata",
         videoId,
       });

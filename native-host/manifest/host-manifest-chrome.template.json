@@ -1,0 +1,7 @@
+{
+  "name": "com.stage_ria.ytrestrictor",
+  "description": "YouTube Restrictor native messaging host — a dumb stdio<->socket pipe, no blocklist logic.",
+  "path": "__HOST_PATH__",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://__EXTENSION_ID__/"]
+}

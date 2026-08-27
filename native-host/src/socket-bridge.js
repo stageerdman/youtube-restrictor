@@ -1,6 +1,6 @@
 "use strict";
 // Connects to the menu bar app's Unix socket as a client (the app is the
-// long-running side; this host is spawned fresh by Firefox per session)
+// long-running side; this host is spawned fresh by the browser per session)
 // and forwards messages in both directions. Retries on disconnect since
 // the app may not be running yet. No blocklist logic — pure pipe.
 

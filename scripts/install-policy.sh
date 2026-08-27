@@ -16,7 +16,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_BUNDLE="/Applications/Zen.app"
 EXTENSION_ID="youtube-restrictor@stage-ria.local"
-POLICY_TEMPLATE="$REPO_ROOT/extension/policies.template.json"
+POLICY_TEMPLATE="$REPO_ROOT/extension-firefox/policies.template.json"
 DISTRIBUTION_DIR="$APP_BUNDLE/Contents/Resources/distribution"
 TARGET_FILE="$DISTRIBUTION_DIR/policies.json"
 

@@ -1,7 +1,8 @@
 # Native Messaging Protocol
 
-Version: `0.1.0` — implemented by `native-host/`, `extension/src/messaging/`,
-and `menubar-app/`.
+Version: `0.1.0` — implemented by `native-host/`, `shared/messaging/`
+(used by both `extension-firefox/` and `extension-chrome/`), and
+`menubar-app/`.
 
 All messages are single-line JSON objects exchanged over Firefox's
 [Native Messaging](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging)
@@ -16,7 +17,7 @@ must be ignored (not error) by both sides, to allow forward compatibility.
 
 ### `heartbeat`
 Sent every 60s regardless of playback state, by
-`extension/src/messaging/native-client.js`. `menubar-app/`'s
+`shared/messaging/native-client.js`. `menubar-app/`'s
 `HeartbeatMonitor` tracks the last one received; if Firefox is running
 and none has arrived for 5 minutes, `EnforcementController` quits
 Firefox (`FirefoxEnforcer`) — the menu bar app only needs to know
@@ -25,6 +26,18 @@ Firefox (`FirefoxEnforcer`) — the menu bar app only needs to know
 ```json
 { "type": "heartbeat", "version": "0.1.0", "timestamp": 1234567890000 }
 ```
+
+**Chrome-specific caveat:** on Firefox, the background page (and its
+native-messaging port) stays alive continuously. Chrome's MV3 service
+worker gets killed after ~30s idle, taking the native-messaging port
+down with it — `chrome.alarms` wakes it back up to send the next
+heartbeat, but the port itself is only actually open for a brief window
+around each heartbeat, not continuously. A `blocklist-update` pushed by
+the menu bar app while Chrome's worker is asleep won't arrive until the
+next heartbeat wakes it (up to ~60s later), unlike Firefox where it
+arrives immediately. Both extensions still enforce every block locally
+regardless of this, so this only affects how quickly a *new* blocklist
+change propagates to an already-open Chrome tab.
 
 ### `match-detected`
 Not implemented yet (no current consumer) — for visibility only, since
@@ -66,7 +79,7 @@ channel IDs — matched case-insensitively. Native youtube.com pages read
 the name straight off the page; embedded players (cross-origin iframes)
 can't expose anything but a video ID, so the extension resolves the name
 via YouTube's public oEmbed endpoint (see
-`extension/src/messaging/oembed-resolver.js`) before matching.
+`shared/messaging/oembed-resolver.js`) before matching.
 
 ## Versioning
 
