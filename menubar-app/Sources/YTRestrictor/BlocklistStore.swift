@@ -1,18 +1,22 @@
 import Foundation
 
-/// Owns the live, enforced blocklist and its persistence to plain JSON.
-/// Adding an entry (tightening) applies and pushes immediately. Removing
-/// one (loosening) is delegated to FrictionController and only actually
-/// changes `blocklist` once that entry's delay has elapsed — see
-/// CLAUDE.md's asymmetric-friction principle.
+/// Owns the live, enforced blocklist, its persistence to plain JSON, and
+/// pushing it out over the messaging server. Adding an entry (tightening)
+/// applies and pushes immediately. Removing one (loosening) is delegated
+/// to FrictionController and only actually changes `blocklist` once that
+/// entry's delay has elapsed — see CLAUDE.md's asymmetric-friction
+/// principle.
+///
+/// Owns (rather than being wired to from outside, e.g. from the App
+/// struct's init) its MessagingServer deliberately: this class's own
+/// init is the one place guaranteed to run exactly once against the
+/// real, persistent instance — unlike code in the SwiftUI App struct's
+/// init(), which can end up wiring a throwaway @StateObject instance
+/// that the view graph never actually uses.
 final class BlocklistStore: ObservableObject {
     @Published private(set) var blocklist: Blocklist
     let friction: FrictionController
-
-    /// Fired with the new blocklist every time it actually changes
-    /// (add, or a removal finally applying) — MessagingServer pushes on
-    /// this.
-    var onChange: ((Blocklist) -> Void)?
+    private let messagingServer = MessagingServer()
 
     init() {
         self.blocklist = Self.load()
@@ -20,6 +24,17 @@ final class BlocklistStore: ObservableObject {
         friction.onApply = { [weak self] kind, value in
             self?.applyRemoval(kind: kind, value: value)
         }
+
+        // Push the current blocklist as soon as a native host connects,
+        // so a freshly (re)launched extension is in sync immediately
+        // rather than waiting for the next edit. Wired before start()
+        // so there's no window where an early connection could arrive
+        // before this callback is set.
+        messagingServer.onClientConnected = { [weak self] in
+            guard let self else { return }
+            self.messagingServer.broadcast(NativeMessage.blocklistUpdate(self.blocklist))
+        }
+        messagingServer.start()
     }
 
     // MARK: - Instant (tightening)
@@ -77,7 +92,7 @@ final class BlocklistStore: ObservableObject {
 
     private func persistAndNotify() {
         persist()
-        onChange?(blocklist)
+        messagingServer.broadcast(NativeMessage.blocklistUpdate(blocklist))
     }
 
     private func persist() {

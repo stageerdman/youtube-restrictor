@@ -3,25 +3,19 @@ import SwiftUI
 @main
 struct YTRestrictorApp: App {
     @StateObject private var store = BlocklistStore()
-    private let messagingServer = MessagingServer()
 
     init() {
         // No Info.plist (this runs as a plain Swift Package executable,
         // not an app bundle yet — see Phase 6 for launchd/.app
         // packaging), so hide the Dock icon at runtime instead.
+        //
+        // Deliberately doesn't touch `store` here: reading a
+        // @StateObject-wrapped property inside init() isn't guaranteed
+        // to be the same instance the view graph later binds to (it can
+        // silently be a second, separate BlocklistStore whose messaging
+        // wiring never sees real edits). All of that wiring lives inside
+        // BlocklistStore's own init instead, which has no such ambiguity.
         NSApplication.shared.setActivationPolicy(.accessory)
-
-        messagingServer.start()
-        let server = messagingServer
-        store.onChange = { blocklist in
-            server.broadcast(NativeMessage.blocklistUpdate(blocklist))
-        }
-        // Push the current blocklist as soon as a native host connects,
-        // so a freshly (re)launched extension is in sync immediately
-        // rather than waiting for the next edit.
-        messagingServer.onClientConnected = { [store] in
-            server.broadcast(NativeMessage.blocklistUpdate(store.blocklist))
-        }
     }
 
     var body: some Scene {

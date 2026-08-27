@@ -14,6 +14,24 @@ struct Blocklist: Codable, Equatable {
     var keywords: [String] = []
 
     static let empty = Blocklist()
+
+    init(channels: [String] = [], videoIds: [String] = [], keywords: [String] = []) {
+        self.channels = channels
+        self.videoIds = videoIds
+        self.keywords = keywords
+    }
+
+    // Custom decoding so an on-disk file from an older schema (missing a
+    // field this shape has since gained) degrades that one field to
+    // empty instead of failing to decode at all and silently wiping the
+    // owner's entire blocklist back to .empty — that happened once
+    // already, when `channels` replaced `channelIds`.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        channels = try container.decodeIfPresent([String].self, forKey: .channels) ?? []
+        videoIds = try container.decodeIfPresent([String].self, forKey: .videoIds) ?? []
+        keywords = try container.decodeIfPresent([String].self, forKey: .keywords) ?? []
+    }
 }
 
 enum BlocklistEntryKind: String, Codable {
