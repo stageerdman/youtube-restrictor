@@ -1,0 +1,16 @@
+{
+  "policies": {
+    "Preferences": {
+      "xpinstall.signatures.required": {
+        "Value": false,
+        "Status": "locked"
+      }
+    },
+    "ExtensionSettings": {
+      "__EXTENSION_ID__": {
+        "installation_mode": "force_installed",
+        "install_url": "__XPI_FILE_URL__"
+      }
+    }
+  }
+}

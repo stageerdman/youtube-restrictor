@@ -21,6 +21,7 @@ native-host/manifest/run-host.sh
 
 # Extension build output
 extension/web-ext-artifacts/
+extension/build/
 extension/*.zip
 extension/*.xpi
 
