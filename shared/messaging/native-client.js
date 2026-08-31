@@ -78,23 +78,25 @@
   }
 
   function sendHeartbeatViaSendNativeMessage() {
-    try {
-      const result = ytRestrictorRuntime.runtime.sendNativeMessage(
-        HOST_NAME,
-        { type: "heartbeat", version: PROTOCOL_VERSION, timestamp: Date.now() },
-        handleMessage,
-      );
-      // Chrome/Firefox's callback form returns undefined; Safari (and
-      // Chrome/Firefox when no callback is passed) returns a Promise —
-      // handle both without double-calling handleMessage.
-      if (result && typeof result.then === "function") {
-        result.then(handleMessage).catch((err) => {
-          log("sendNativeMessage failed:", err.message);
-        });
-      }
-    } catch (err) {
-      log("failed to send heartbeat:", err.message);
-    }
+    // This path only runs when connectNative is missing, which today
+    // means ytRestrictorRuntime is the `browser` namespace (Safari uses
+    // it, same as Firefox — see runtime-shim.js), not `chrome`. browser.*
+    // APIs are strictly Promise-based with no callback parameter —
+    // sendNativeMessage(application, message) takes exactly two
+    // arguments. Passing a third callback argument here used to also
+    // consume the return value as a Promise, which risked calling
+    // handleMessage (and hitting the native handler) twice per heartbeat
+    // for what should be a single round trip.
+    ytRestrictorRuntime.runtime
+      .sendNativeMessage(HOST_NAME, {
+        type: "heartbeat",
+        version: PROTOCOL_VERSION,
+        timestamp: Date.now(),
+      })
+      .then(handleMessage)
+      .catch((err) => {
+        log("failed to send heartbeat:", err.message);
+      });
   }
 
   function sendHeartbeat() {

@@ -10,10 +10,13 @@ import Foundation
 /// to. See docs/PROTOCOL.md's "Safari's transport" for why this is a
 /// poll instead of a push.
 final class SafariHeartbeatWatcher {
-    /// Well under HeartbeatMonitor.staleAfter (5 min) and Safari's own
-    /// ~60s heartbeat interval — just needs to notice a new timestamp
-    /// reasonably promptly, not react instantly.
-    private static let pollIntervalSeconds: TimeInterval = 15
+    /// Matches Safari's own ~60s heartbeat-send interval — polling faster
+    /// than that can't notice anything sooner, and every poll is a file
+    /// read against the App Group container, which macOS's cross-app-
+    /// container consent check (see AppGroupPaths.containerDirectory's
+    /// doc comment) treats as a separate access to justify. Well under
+    /// HeartbeatMonitor.staleAfter (5 min) either way.
+    private static let pollIntervalSeconds: TimeInterval = 60
 
     private let heartbeatMonitor: HeartbeatMonitor
     private var timer: Timer?
@@ -24,7 +27,14 @@ final class SafariHeartbeatWatcher {
     }
 
     func start() {
-        poll()
+        // Deliberately no immediate poll() here — BlocklistStore.init()
+        // already touches the same App Group container once, moments
+        // earlier in AppCoordinator's init sequence. Polling immediately
+        // too means two independent, near-simultaneous accesses to the
+        // same container at every launch, which is exactly what was
+        // producing a back-to-back double consent prompt. HeartbeatMonitor
+        // is seeded to "now" at construction, so there's no correctness
+        // cost to just waiting for the first regular tick.
         timer = Timer.scheduledTimer(
             withTimeInterval: Self.pollIntervalSeconds, repeats: true
         ) { [weak self] _ in

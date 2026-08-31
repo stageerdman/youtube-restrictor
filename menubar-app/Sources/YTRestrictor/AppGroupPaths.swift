@@ -17,9 +17,19 @@ enum AppGroupPaths {
     /// target calls this — both callers treat that as "relay unavailable"
     /// rather than crashing, since a signing/provisioning problem
     /// shouldn't take down the rest of the app or the extension.
-    static var containerDirectory: URL? {
+    ///
+    /// `static let`, not `var`: resolving this container triggers macOS's
+    /// cross-app-container consent check on the unsandboxed app side (see
+    /// docs/PROTOCOL.md's "Safari's transport" — a personal-team/non-App-
+    /// Store signed app isn't fully trusted for this the way a Mac App
+    /// Store or properly provisioned build would be). Resolving it fresh
+    /// on every access multiplies how often that check fires; resolving
+    /// it once per process and reusing the result is both cheaper and
+    /// less friction-prone, at the cost of not noticing if the App Group
+    /// becomes available/unavailable mid-run — never happens in practice
+    /// since entitlements are fixed at launch.
+    static let containerDirectory: URL? =
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier)
-    }
 
     /// Written by SafariWebExtensionHandler.beginRequest() every time a
     /// `heartbeat` arrives; polled by SafariHeartbeatWatcher.
