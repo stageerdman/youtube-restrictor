@@ -1,10 +1,15 @@
 # Native Messaging Protocol
 
 Version: `0.1.0` — implemented by `native-host/`, `shared/messaging/`
-(used by both `extension-firefox/` and `extension-chrome/`), and
-`menubar-app/`.
+(used by `extension-firefox/`, `extension-chrome/`, and
+`extension-safari/`), and `menubar-app/`.
 
-All messages are single-line JSON objects exchanged over Firefox's
+All messages are single-line JSON objects. The **message shapes** below
+are shared by all three browsers, but the **transport** carrying them
+differs for Safari — see "Safari's transport" at the end of this file
+before assuming the stdio/socket description applies there too.
+
+For Firefox and Chrome, messages are exchanged over Firefox's
 [Native Messaging](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging)
 stdio protocol (4-byte little-endian length prefix + UTF-8 JSON payload,
 handled by the native messaging host — the extension and the menu bar app
@@ -87,3 +92,61 @@ Bump the minor version for additive/backward-compatible changes (new
 optional fields, new message `type`), major for breaking changes to an
 existing message shape. Both ends should log (not crash on) a
 `version` they don't recognize.
+
+## Safari's transport
+
+Safari Web Extensions don't support spawning an external native-
+messaging-host process the way Firefox and Chrome do — there's no
+`native-host/host.js` equivalent on Safari, and no persistent
+`browser.runtime.connectNative()` port. The only native-messaging API
+Safari implements is one-shot `browser.runtime.sendNativeMessage()`,
+which macOS routes directly to `SFSafariExtensionHandler.beginRequest()`
+in `menubar-app/SafariExtension/SafariWebExtensionHandler.swift` — a
+single request-in/response-out override, not a connection object either
+side can push unsolicited messages on. `shared/messaging/native-client.js`
+detects the missing `connectNative` at runtime and falls back to
+`sendNativeMessage` automatically; no separate Safari-only copy of that
+file exists.
+
+Practical effect: **every `heartbeat` doubles as a poll for the current
+blocklist on Safari.** The extension sends `heartbeat` as its
+`sendNativeMessage` payload every 60s (same cadence as Firefox/Chrome);
+`SafariWebExtensionHandler.beginRequest()` responds to that same call
+with a `blocklist-update` message (or nothing new if nothing changed) —
+there's no way for `menubar-app` to push a `blocklist-update` to Safari
+the instant the owner edits the blocklist the way it does for
+Firefox/Chrome over the socket. A blocklist change can take up to ~60s
+to reach an already-open Safari tab. Firefox has no such gap; Chrome's
+existing MV3 service-worker-sleep gap (see the heartbeat section above)
+is a close analogue, not identical — Chrome's is incidental (only when
+the worker happens to be asleep), Safari's is structural (every time).
+
+Also structural: `SafariWebExtensionHandler` runs inside the Safari Web
+Extension's own App Extension process (a `.appex`, sandboxed —
+`com.apple.security.app-sandbox` is mandatory for Safari Web Extensions,
+unlike `native-host/` and `menubar-app/`, which are deliberately
+unsandboxed so they can use a plain Unix domain socket). A sandboxed
+process can't open an arbitrary path like
+`~/Library/Application Support/YTRestrictor/host.sock`. Instead,
+`menubar-app`'s app target and its Safari Web Extension target share an
+[App Group](https://developer.apple.com/documentation/xcode/configuring-app-groups)
+container (`group.com.stage-ria.ytrestrictor` — see
+`menubar-app/project.yml`), and relay through two small files there
+instead of the socket:
+
+- `safari-blocklist.json` — written by `BlocklistStore` (mirrors
+  `blocklist.json` under Application Support) every time the blocklist
+  changes; read by `beginRequest()` to build its `blocklist-update`
+  response.
+- `safari-heartbeat.json` — written by `beginRequest()` every time a
+  `heartbeat` arrives; polled by `SafariHeartbeatWatcher` (menubar-app's
+  main process, not sandboxed) roughly every 15s and fed into the same
+  `HeartbeatMonitor` Firefox and Chrome already report to — so stale
+  detection and quit-the-browser enforcement work identically across
+  all three, just via a polled file instead of a live socket message on
+  Safari's side.
+
+This is a deliberate adaptation of the same message shapes to a
+transport Apple actually supports for Safari Web Extensions, not a
+protocol version change — `heartbeat` and `blocklist-update` still mean
+exactly what they mean above.

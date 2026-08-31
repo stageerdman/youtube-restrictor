@@ -5,14 +5,28 @@
 //
 // Uses the alarms API rather than setInterval for scheduling: Chrome's
 // MV3 service worker gets killed after ~30s idle, which would silently
-// stop a setInterval forever, but alarms wake the worker back up. Both
-// Firefox and Chrome implement alarms, so this is a no-behavior-change
-// on the Firefox side.
+// stop a setInterval forever, but alarms wake the worker back up. All
+// three browsers implement alarms, so this is a no-behavior-change on
+// the Firefox/Chrome side.
+//
+// Safari's WebExtension implementation only supports one-shot
+// browser.runtime.sendNativeMessage() request/response — there's no
+// persistent connectNative() port. Apple routes sendNativeMessage calls
+// to SFSafariExtensionHandler.beginRequest() in the Safari Web
+// Extension's native Swift code (menubar-app/SafariExtension/), which
+// has one request-in/response-out override point, not a connection
+// object to push unsolicited messages on. So on Safari every heartbeat
+// doubles as a poll for the current blocklist, arriving as that same
+// request's response instead of pushed asynchronously at any time like
+// Firefox/Chrome — see docs/PROTOCOL.md's "Safari transport" section.
 (function () {
   const HOST_NAME = "com.stage_ria.ytrestrictor";
   const HEARTBEAT_ALARM_NAME = "yt-restrictor-heartbeat";
   const HEARTBEAT_INTERVAL_MINUTES = 1;
   const PROTOCOL_VERSION = "0.1.0";
+
+  const supportsConnectNative =
+    typeof ytRestrictorRuntime.runtime.connectNative === "function";
 
   let port = null;
 
@@ -47,7 +61,7 @@
     log("connected to native host");
   }
 
-  function sendHeartbeat() {
+  function sendHeartbeatViaPort() {
     if (!port) connect();
     if (!port) return;
 
@@ -60,6 +74,34 @@
     } catch (err) {
       log("failed to send heartbeat:", err.message);
       port = null;
+    }
+  }
+
+  function sendHeartbeatViaSendNativeMessage() {
+    try {
+      const result = ytRestrictorRuntime.runtime.sendNativeMessage(
+        HOST_NAME,
+        { type: "heartbeat", version: PROTOCOL_VERSION, timestamp: Date.now() },
+        handleMessage,
+      );
+      // Chrome/Firefox's callback form returns undefined; Safari (and
+      // Chrome/Firefox when no callback is passed) returns a Promise —
+      // handle both without double-calling handleMessage.
+      if (result && typeof result.then === "function") {
+        result.then(handleMessage).catch((err) => {
+          log("sendNativeMessage failed:", err.message);
+        });
+      }
+    } catch (err) {
+      log("failed to send heartbeat:", err.message);
+    }
+  }
+
+  function sendHeartbeat() {
+    if (supportsConnectNative) {
+      sendHeartbeatViaPort();
+    } else {
+      sendHeartbeatViaSendNativeMessage();
     }
   }
 
