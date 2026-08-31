@@ -8,8 +8,9 @@ this repo is developed.
 
 ## How it works (eventually)
 
-- A **browser extension** — Firefox/Zen and Chrome both supported —
-  watches for YouTube playback and checks it against a blocklist.
+- A **browser extension** — Firefox/Zen, Chrome, and Safari all
+  supported — watches for YouTube playback and checks it against a
+  blocklist.
 - A **macOS menu bar app** holds that blocklist, the same one either
   extension reads. You edit it there. Adding a restriction is instant;
   removing one takes a typed confirmation and a delay, on purpose —
@@ -36,22 +37,40 @@ native messaging to the same menu bar app all work (`extension-chrome/`,
 Manifest V3). The force-install lockdown Firefox/Zen has (Phase 7) does
 not exist yet for Chrome — it needs a different mechanism (a signed
 `.crx` + a root-owned policy file) that hasn't been built. Until then,
-Chrome only has a normal, removable "unpacked" install. See "Setup"
-below, or `docs/HOW-IT-WORKS.md` for the architecture behind all of it.
+Chrome only has a normal, removable "unpacked" install.
+
+**Safari support is newer too, and structurally can't be locked down
+the same way as Firefox/Zen — nor can any browser be, without MDM.**
+Detection, blocking, and messaging to the same menu bar app all work
+(`extension-safari/`, Manifest V3), but Safari Web Extensions don't
+support the stdio native-messaging model Firefox/Chrome use at all —
+`menubar-app/` itself had to become the Safari extension's container
+app (an Xcode project now, alongside the still-working `Package.swift`)
+and messages relay through a sandboxed App Extension and an App Group
+shared container instead of the socket `native-host/` uses. See
+`docs/PROTOCOL.md`'s "Safari's transport" section and
+`docs/HOW-IT-WORKS.md` for exactly why and what that changes. Like
+Chrome, Safari only has a normal, removable install — enabled per
+Safari's own Settings → Extensions toggle. See "Setup" below, or
+`docs/HOW-IT-WORKS.md` for the architecture behind all of it.
 
 ## Repo layout
 
 - `shared/` — the detection/matching/blocking/messaging logic used by
-  *both* browser extensions (copied into each one by
+  *all three* browser extensions (copied into each one by
   `scripts/sync-shared-extension-sources.sh` — always edit here, never
   in the copies below).
 - `extension-firefox/` — the Firefox/Zen WebExtension (Manifest V2).
 - `extension-chrome/` — the Chrome extension (Manifest V3).
-- `native-host/` — the native-messaging bridge (thin stdio↔socket pipe,
-  no blocklist logic — see `native-host/README.md`).
+- `extension-safari/` — the Safari extension (Manifest V3); also
+  embedded into `menubar-app/` as the Safari Web Extension's Resources.
+- `native-host/` — the native-messaging bridge for Firefox/Chrome (thin
+  stdio↔socket pipe, no blocklist logic — see `native-host/README.md`).
+  Safari has no equivalent — see `docs/HOW-IT-WORKS.md`.
 - `menubar-app/` — the SwiftUI menu bar app that owns the blocklist and
-  the asymmetric-friction rules, the same one both extensions talk to —
-  see `menubar-app/README.md`.
+  the asymmetric-friction rules, the same one all three extensions talk
+  to — see `menubar-app/README.md`. Also the Safari Web Extension's
+  container app.
 - `docs/PROTOCOL.md` — the JSON message format the extensions and menu
   bar app use to talk to each other.
 - `docs/HOW-IT-WORKS.md` — a short architecture overview, for whoever's
@@ -149,6 +168,34 @@ process when idle, a blocklist change you make in the app can take up
 to about a minute to reach an already-open Chrome tab, instead of
 arriving instantly like it does in Zen (see `docs/PROTOCOL.md` for why).
 
+### Safari (not locked down, and structurally can't be the same way)
+
+Safari Web Extensions need more setup than Firefox/Chrome because
+they have to ship inside a signed native app — that app is
+`menubar-app/YTRestrictor`. Full instructions (including the one-time
+Xcode signing step, which has to happen in Xcode's own GUI and can't be
+scripted) are in `menubar-app/README.md`'s "Safari Web Extension"
+section. Short version:
+
+1. Install Xcode (not just Command Line Tools) and `brew install
+   xcodegen`.
+2. `cd menubar-app && ../scripts/generate-xcode-project.sh && open
+   YTRestrictor.xcodeproj`.
+3. In Xcode, pick your Apple ID as the Team for both the `YTRestrictor`
+   and `YTRestrictorSafariExtension` targets (Signing & Capabilities) —
+   a free account is enough, this never touches the App Store.
+4. Build and run once from Xcode, then in Safari: Settings → Developer
+   → **Allow Unsigned Extensions**, and Settings → Extensions → enable
+   "YouTube Restrictor" and grant it `youtube.com` access.
+
+Every blocklist change takes up to about a minute to reach an
+already-open Safari tab — structurally, not incidentally, since Safari
+extensions can only ever *poll* for updates rather than have them
+pushed (see `docs/PROTOCOL.md`'s "Safari's transport" for exactly why).
+Removing it is Settings → Extensions → uncheck the box, or delete
+`YTRestrictor.app` entirely — same as removing the menu bar app itself,
+since there's nothing Safari-specific left behind once that's gone.
+
 ### Uninstalling completely
 
 You are always in full control of your own machine. To remove
@@ -161,12 +208,14 @@ rm -rf menubar-app/build/YTRestrictor.app
 rm /Applications/Zen.app/Contents/Resources/distribution/policies.json
 rm "$HOME/Library/Application Support/Mozilla/NativeMessagingHosts/com.stage_ria.ytrestrictor.json"
 rm "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.stage_ria.ytrestrictor.json"
+rm -rf "$HOME/Library/Group Containers/group.com.stage-ria.ytrestrictor"
 ```
 
-Then remove the extension normally from `about:addons` in Zen and/or
-`chrome://extensions` in Chrome. There's no hidden step and nothing
-left behind that requires special tools — this is a self-control tool,
-not something designed to resist you.
+Then remove the extension normally from `about:addons` in Zen,
+`chrome://extensions` in Chrome, and/or Safari → Settings →
+Extensions. There's no hidden step and nothing left behind that
+requires special tools — this is a self-control tool, not something
+designed to resist you.
 
 ## For developers: trying the Firefox/Zen extension without installing anything
 
@@ -190,6 +239,9 @@ Firefox/Zen restarts — it's for development only. For the real,
 persistent setup, use the "Setup" section above. (For Chrome, there's
 no separate dev-only flow — "Load unpacked" in the Chrome setup section
 above already is the lightweight iteration path, since Chrome has no
-lockdown yet to route around.) See `scripts/build.sh` to
-build/lint/typecheck everything at once — it also re-syncs `shared/`
-into both extensions first.
+lockdown yet to route around. For Safari, there's no lightweight flow
+either — "Allow Unsigned Extensions" + Settings → Extensions in the
+Safari setup section above already is the equivalent of an unpacked/
+temporary install, since Safari requires the signed container app
+either way.) See `scripts/build.sh` to build/lint/typecheck everything
+at once — it also re-syncs `shared/` into all three extensions first.

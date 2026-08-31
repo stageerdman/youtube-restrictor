@@ -9,8 +9,11 @@ Operating instructions for any agent working in this repository. Read
 1. **Modularity above all.** Three components, three clean boundaries, no
    leaking abstractions between them:
    - The browser extension — knows nothing about how the macOS app is
-     implemented; only speaks the native-messaging JSON protocol defined
-     in `docs/PROTOCOL.md`. Two browser targets share one detection/
+     implemented; only speaks the messaging protocol defined in
+     `docs/PROTOCOL.md` (native-messaging JSON for Firefox/Chrome; a
+     request/response variant of the same message shapes for Safari —
+     see that doc's "Safari's transport" section for why Safari can't
+     use the same transport). Three browser targets share one detection/
      matching/blocking codebase in `shared/` (browser-agnostic, no
      `browser.*`/`chrome.*` calls outside `shared/messaging/` and
      `shared/runtime-shim.js`), copied into each browser's own
@@ -22,12 +25,26 @@ Operating instructions for any agent working in this repository. Read
        Phase 7 in `INIT.md`).
      - `extension-chrome/` — Manifest V3 (service worker background,
        required by MV3 — see `extension-chrome/service-worker.js`).
-   - `native-host/` — the native messaging host binary/script. A thin,
-     dumb pipe: stdin/stdout framing per Firefox's native messaging spec,
-     forwards messages to/from the macOS app. No blocklist logic lives
-     here.
+     - `extension-safari/` — Manifest V3, same shape as
+       `extension-chrome/`. Its `src/` copy also doubles as the Safari
+       Web Extension App Extension target's bundled `Resources/` — see
+       `menubar-app/project.yml`.
+   - `native-host/` — the native messaging host binary/script for
+     Firefox and Chrome. A thin, dumb pipe: stdin/stdout framing per
+     Firefox's native messaging spec, forwards messages to/from the
+     macOS app. No blocklist logic lives here. **Safari has no
+     equivalent** — its native-messaging model routes straight into
+     `menubar-app/SafariExtension/`'s Swift code instead (see below and
+     `docs/HOW-IT-WORKS.md`), since Safari doesn't support spawning an
+     external host process the way Firefox/Chrome do.
    - `menubar-app/` — the SwiftUI macOS app. Owns the blocklist, owns the
-     heartbeat/enforcement logic, owns all UI.
+     heartbeat/enforcement logic, owns all UI. As of Safari support it's
+     also the Safari Web Extension's *container app* (Safari Web
+     Extensions must ship embedded inside a native app bundle) — its
+     `SafariExtension/` target is still governed by this same modularity
+     principle: it's a thin relay (App Group shared-container reads/
+     writes only, mirroring `native-host/`'s "no blocklist logic" rule),
+     never a second place blocklist or friction logic lives.
    - Within each component, split further: detection logic, matching
      logic, and UI/presentation should be separate files/modules, each
      independently testable. If a function is doing two of
@@ -79,14 +96,15 @@ Operating instructions for any agent working in this repository. Read
 ├── README.md
 ├── .gitignore
 ├── docs/
-│   ├── PROTOCOL.md          # native-messaging JSON message schema, versioned
+│   ├── PROTOCOL.md          # message schema, versioned (native-messaging JSON
+│   │                        # for Firefox/Chrome, App Group file relay for Safari)
 │   └── HOW-IT-WORKS.md      # architecture overview
-├── shared/                  # detect/match/block/messaging logic, both browsers
+├── shared/                  # detect/match/block/messaging logic, all three browsers
 │   ├── detect/              # player detection (native + embedded)
 │   ├── match/                # blocklist matching logic
 │   ├── block/                # playback interruption / placeholder UI
 │   ├── messaging/            # native messaging + heartbeat client
-│   ├── runtime-shim.js       # picks `browser` (Firefox) vs `chrome` (Chrome)
+│   ├── runtime-shim.js       # picks `browser` (Firefox/Safari) vs `chrome` (Chrome)
 │   └── background.js
 ├── extension-firefox/
 │   ├── manifest.json        # MV2
@@ -96,20 +114,36 @@ Operating instructions for any agent working in this repository. Read
 │   ├── manifest.json        # MV3
 │   ├── service-worker.js    # MV3 background entry point (imports src/*)
 │   └── src/                 # populated from shared/, do not edit directly
+├── extension-safari/
+│   ├── manifest.json        # MV3, same shape as extension-chrome/
+│   ├── service-worker.js    # MV3 background entry point (imports src/*)
+│   └── src/                 # populated from shared/, do not edit directly —
+│                             # also embedded as the Safari Web Extension App
+│                             # Extension target's Resources/, see menubar-app/
 ├── native-host/
 │   ├── host.(js|swift)
-│   └── manifest/            # NativeMessagingHosts manifest templates, per browser
+│   └── manifest/            # NativeMessagingHosts manifest templates, Firefox + Chrome
 ├── menubar-app/
-│   └── YTRestrictor/        # SwiftUI Xcode project
+│   ├── Sources/YTRestrictor/  # the app itself (SwiftUI, both Package.swift and
+│   │                           # the Xcode project below build this same tree)
+│   ├── SafariExtension/       # Safari Web Extension App Extension target's
+│   │                           # native Swift code — thin relay only, see above
+│   ├── project.yml            # xcodegen spec -> YTRestrictor.xcodeproj (gitignored,
+│   │                           # generated — see scripts/generate-xcode-project.sh)
+│   └── Package.swift          # still works for `swift build`/`swift run`,
+│                               # non-Safari dev work only (SPM can't build
+│                               # App Extension bundle products)
 └── scripts/
     ├── build.sh                            # builds everything, see below
     ├── sync-shared-extension-sources.sh    # shared/ -> each extension's src/
     ├── install-native-host.sh              # Firefox native-messaging registration
     ├── install-native-host-chrome.sh       # Chrome native-messaging registration
-    └── install-policy.sh                   # installs/updates Zen policies.json
+    ├── install-policy.sh                   # installs/updates Zen policies.json
+    ├── generate-xcode-project.sh           # xcodegen generate for menubar-app/
+    └── package-menubar-app-xcode.sh        # signed build w/ Safari extension embedded
 ```
 
-Adjust as the project evolves, but keep the boundary between the three
+Adjust as the project evolves, but keep the boundary between the
 components intact — don't collapse them into one flat directory.
 
 ## Git / GitHub sync (mandatory, every session)
