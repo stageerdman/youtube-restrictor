@@ -4,6 +4,15 @@
 # killed (crash, force-quit, or its own Quit button). Re-run this any
 # time the plist template changes or the repo moves.
 #
+# By default this packages via plain `swift build` (package-menubar-
+# app.sh) — no Xcode, no signing, no Safari extension, same as before
+# Safari support existed. Pass --xcode to instead build via xcodebuild
+# (package-menubar-app-xcode.sh), which embeds the Safari Web Extension
+# but requires full Xcode and a one-time Signing & Capabilities step —
+# see menubar-app/README.md's "Safari Web Extension" section. Only
+# needed if you want Safari support; Firefox/Chrome are unaffected
+# either way.
+#
 # To fully and permanently remove it (the owner is always the ultimate
 # authority — see CLAUDE.md):
 #   launchctl unload ~/Library/LaunchAgents/com.stage-ria.ytrestrictor-app.plist
@@ -20,7 +29,11 @@ TARGET_DIR="$HOME/Library/LaunchAgents"
 TARGET_FILE="$TARGET_DIR/$LABEL.plist"
 LOG_DIR="$HOME/Library/Application Support/YTRestrictor/logs"
 
-"$REPO_ROOT/scripts/package-menubar-app.sh"
+if [ "${1:-}" = "--xcode" ]; then
+  "$REPO_ROOT/scripts/package-menubar-app-xcode.sh"
+else
+  "$REPO_ROOT/scripts/package-menubar-app.sh"
+fi
 
 mkdir -p "$TARGET_DIR" "$LOG_DIR"
 sed \

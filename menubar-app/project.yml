@@ -1,0 +1,113 @@
+# Generates YTRestrictor.xcodeproj (gitignored, regenerate any time with
+# scripts/generate-xcode-project.sh). This project.yml is the source of
+# truth for anything Xcode-specific — never hand-edit the .xcodeproj.
+#
+# Two targets:
+#   - YTRestrictor: the existing SwiftUI menu bar app (Sources/YTRestrictor/,
+#     unchanged by this file — Package.swift still works for `swift build`/
+#     `swift run` against that same source tree for non-Safari dev work).
+#     This is also the Safari Web Extension's *container app* — see
+#     docs/HOW-IT-WORKS.md's "Why Safari needed a different mechanism" for
+#     why it's this app and not a fourth standalone process.
+#   - YTRestrictorSafariExtension: the Safari Web Extension App Extension,
+#     embedded into YTRestrictor.app's PlugIns/ at build time. Sandboxed
+#     (mandatory for Safari Web Extensions, unlike the other two targets in
+#     this repo). Its JS/manifest resources are extension-safari/, synced
+#     from shared/ by scripts/sync-shared-extension-sources.sh — run that
+#     before generating/building, same as any other build.
+#
+# Both targets share an App Group (group.com.stage-ria.ytrestrictor) —
+# the relay mechanism docs/PROTOCOL.md's "Safari's transport" section
+# describes, since the sandboxed extension can't reach the Unix socket
+# native-host/ and Firefox/Chrome use.
+name: YTRestrictor
+options:
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+
+targets:
+  YTRestrictor:
+    type: application
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: Sources/YTRestrictor
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.stage-ria.ytrestrictor-app
+        PRODUCT_NAME: YTRestrictor
+        INFOPLIST_FILE: Packaging/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ENABLE_HARDENED_RUNTIME: YES
+        COMBINE_HIDPI_IMAGES: YES
+    entitlements:
+      path: YTRestrictor.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+        com.apple.security.application-groups:
+          - group.com.stage-ria.ytrestrictor
+    dependencies:
+      - target: YTRestrictorSafariExtension
+        embed: true
+
+  YTRestrictorSafariExtension:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: SafariExtension/SafariWebExtensionHandler.swift
+      - path: Sources/YTRestrictor/AppGroupPaths.swift
+      - path: Sources/YTRestrictor/Blocklist.swift
+      - path: Sources/YTRestrictor/NativeMessage.swift
+      - path: ../extension-safari/manifest.json
+        type: file
+        buildPhase: resources
+      - path: ../extension-safari/service-worker.js
+        type: file
+        buildPhase: resources
+      - path: ../extension-safari/src
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.stage-ria.ytrestrictor-app.safari-extension
+        PRODUCT_NAME: "YTRestrictor Safari Extension"
+        INFOPLIST_FILE: SafariExtension/Info.plist
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: "YouTube Restrictor"
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SKIP_INSTALL: YES
+        ENABLE_HARDENED_RUNTIME: YES
+        LD_RUNPATH_SEARCH_PATHS:
+          - $(inherited)
+          - "@executable_path/../Frameworks"
+          - "@executable_path/../../../../Frameworks"
+        OTHER_LDFLAGS:
+          - -framework
+          - SafariServices
+    entitlements:
+      path: SafariExtension/YTRestrictorSafariExtension.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups:
+          - group.com.stage-ria.ytrestrictor
+
+schemes:
+  YTRestrictor:
+    build:
+      targets:
+        YTRestrictor: all
+        YTRestrictorSafariExtension: all
+    run:
+      config: Debug
+    archive:
+      config: Release

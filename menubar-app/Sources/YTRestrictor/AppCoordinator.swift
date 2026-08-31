@@ -12,6 +12,12 @@ final class AppCoordinator: ObservableObject {
     let heartbeatMonitor = HeartbeatMonitor()
     private let messagingServer = MessagingServer()
     private let enforcementController: EnforcementController
+    // Safari's counterpart to messagingServer for the heartbeat side —
+    // see SafariHeartbeatWatcher's doc comment and docs/PROTOCOL.md's
+    // "Safari's transport". Safari doesn't push blocklist updates the
+    // app needs to relay anywhere; BlocklistStore.persist() already
+    // writes straight to the App Group file Safari polls on its own.
+    private let safariHeartbeatWatcher: SafariHeartbeatWatcher
 
     init() {
         let messagingServer = self.messagingServer
@@ -19,6 +25,7 @@ final class AppCoordinator: ObservableObject {
 
         self.blocklistStore = BlocklistStore(messagingServer: messagingServer)
         self.enforcementController = EnforcementController(heartbeatMonitor: heartbeatMonitor)
+        self.safariHeartbeatWatcher = SafariHeartbeatWatcher(heartbeatMonitor: heartbeatMonitor)
 
         let blocklistStore = self.blocklistStore
         messagingServer.onMessage = { message in
@@ -34,5 +41,6 @@ final class AppCoordinator: ObservableObject {
             messagingServer.broadcast(NativeMessage.blocklistUpdate(blocklistStore.blocklist))
         }
         messagingServer.start()
+        safariHeartbeatWatcher.start()
     }
 }
