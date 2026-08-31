@@ -25,6 +25,18 @@ options:
   deploymentTarget:
     macOS: "13.0"
   createIntermediateGroups: true
+settings:
+  base:
+    # The owner's own (free, personal-team) Apple ID signing team —
+    # baked in here deliberately, not left for Xcode's Signing &
+    # Capabilities GUI to fill in per-target, because `xcodegen
+    # generate` regenerates the whole .xcodeproj from this file every
+    # time (scripts/generate-xcode-project.sh runs before every build),
+    # which would otherwise silently wipe out a GUI-only team selection
+    # on the next regenerate. If you're not Stage building this for
+    # yourself, replace with your own team ID (Xcode → Settings →
+    # Accounts → your Apple ID → team name shows the ID in parentheses).
+    DEVELOPMENT_TEAM: 39UD3R5UD6
 
 targets:
   YTRestrictor:

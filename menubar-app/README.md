@@ -133,22 +133,33 @@ Chrome are unaffected either way and need none of this.
    ```
    brew install xcodegen
    ```
-3. Generate the project and open it:
+3. Find your Team ID: Xcode → Settings → **Accounts** → sign in with
+   your Apple ID if you haven't already (a free "Personal Team" is
+   enough — no paid Apple Developer Program membership needed for local
+   use, since this never goes through the App Store) → your team name
+   shows the ID in parentheses, e.g. "Stage Erdman (Personal Team)
+   (ABCD123456)".
+4. Put that ID in `project.yml`'s top-level `settings.base.DEVELOPMENT_TEAM`
+   (currently Stage's own team ID — replace it with yours if you're
+   building this for yourself). This has to be baked into `project.yml`
+   itself, not picked once in Xcode's Signing & Capabilities GUI,
+   because `xcodegen generate` regenerates the whole `.xcodeproj` from
+   `project.yml` on every build (`scripts/generate-xcode-project.sh`
+   runs before every `scripts/build.sh` and every
+   `scripts/package-menubar-app-xcode.sh`) — a GUI-only team selection
+   gets silently wiped out on the very next regenerate.
+5. Generate the project and build it once to confirm signing works:
    ```
    ../scripts/generate-xcode-project.sh
    open YTRestrictor.xcodeproj
    ```
-4. In Xcode's navigator, select the **YTRestrictor** target → **Signing
-   & Capabilities** tab → pick your Apple ID under **Team** (a free
-   "Personal Team" is enough — no paid Apple Developer Program
-   membership needed for local use, since this never goes through the
-   App Store). Repeat for the **YTRestrictorSafariExtension** target.
-   Xcode will provision both automatically once a team is picked; this
-   is the one step that has to happen in the GUI and can't be scripted.
-5. Build and run once from Xcode (▶) to confirm it launches — you
-   should see the same shield icon in the menu bar as `swift run`
-   produces. Quit it before continuing (⌘Q from the popover, same as
-   any other build of this app).
+   Then ▶ Run from Xcode — you should see the same shield icon in the
+   menu bar as `swift run` produces, and no signing errors. **Stop it
+   from Xcode's own Stop button (■) before continuing** — a process
+   launched via Xcode's ▶ stays attached to its debugger and won't quit
+   from a plain `kill`/⌘Q if you forget this, which just leaves a
+   second, harmless-but-confusing shield icon running (ask if you ever
+   see two icons and aren't sure why).
 
 **Enabling the extension in Safari:**
 

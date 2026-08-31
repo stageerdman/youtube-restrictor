@@ -24,6 +24,15 @@ final class BlocklistStore: ObservableObject {
         friction.onApply = { [weak self] kind, value in
             self?.applyRemoval(kind: kind, value: value)
         }
+        // Backfill the App Group copy on every launch, not just on the
+        // next edit — otherwise a freshly (re)launched app leaves Safari
+        // reading a stale or missing safari-blocklist.json until the
+        // owner happens to change something, even though AppPaths.
+        // blocklistFile (Firefox/Chrome's copy) already has the real
+        // data. Doesn't broadcast over the socket — messagingServer has
+        // no clients yet at this point; AppCoordinator's
+        // onClientConnected already handles that push separately.
+        persist()
     }
 
     // MARK: - Instant (tightening)
