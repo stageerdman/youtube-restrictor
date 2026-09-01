@@ -12,12 +12,12 @@ final class AppCoordinator: ObservableObject {
     let heartbeatMonitor = HeartbeatMonitor()
     private let messagingServer = MessagingServer()
     private let enforcementController: EnforcementController
-    // Safari's counterpart to messagingServer for the heartbeat side —
-    // see SafariHeartbeatWatcher's doc comment and docs/PROTOCOL.md's
-    // "Safari's transport". Safari doesn't push blocklist updates the
-    // app needs to relay anywhere; BlocklistStore.persist() already
-    // writes straight to the App Group file Safari polls on its own.
-    private let safariHeartbeatWatcher: SafariHeartbeatWatcher
+    // Safari's counterpart to messagingServer — see
+    // SafariLocalRelayServer's doc comment and docs/PROTOCOL.md's
+    // "Safari's transport". Answers both the heartbeat and the
+    // blocklist fetch in one round trip, since Safari has no persistent
+    // connection to push a blocklist-update on separately.
+    private let safariLocalRelayServer: SafariLocalRelayServer
 
     init() {
         let messagingServer = self.messagingServer
@@ -25,9 +25,12 @@ final class AppCoordinator: ObservableObject {
 
         self.blocklistStore = BlocklistStore(messagingServer: messagingServer)
         self.enforcementController = EnforcementController(heartbeatMonitor: heartbeatMonitor)
-        self.safariHeartbeatWatcher = SafariHeartbeatWatcher(heartbeatMonitor: heartbeatMonitor)
 
         let blocklistStore = self.blocklistStore
+        self.safariLocalRelayServer = SafariLocalRelayServer(
+            heartbeatMonitor: heartbeatMonitor,
+            blocklistProvider: { blocklistStore.blocklist }
+        )
         messagingServer.onMessage = { message in
             guard let type = message["type"] as? String, type == "heartbeat" else { return }
             heartbeatMonitor.recordHeartbeat()
@@ -41,6 +44,6 @@ final class AppCoordinator: ObservableObject {
             messagingServer.broadcast(NativeMessage.blocklistUpdate(blocklistStore.blocklist))
         }
         messagingServer.start()
-        safariHeartbeatWatcher.start()
+        safariLocalRelayServer.start()
     }
 }

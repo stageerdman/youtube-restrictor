@@ -2,8 +2,9 @@
 
 The SwiftUI menu bar app. Owns the blocklist, the asymmetric-friction
 rules, and pushes updates to the extension over a local Unix domain
-socket that `native-host/` connects to (Firefox/Chrome) or an App Group
-shared container (Safari) — see `docs/PROTOCOL.md`.
+socket that `native-host/` connects to (Firefox/Chrome) or a loopback-
+only TCP connection the Safari extension dials into (Safari) — see
+`docs/PROTOCOL.md`.
 
 Built as a Swift Package (`swift build`/`swift run` — fast dev loop,
 still works for everything except the Safari extension target). As of
@@ -23,13 +24,16 @@ run under `launchd` — see "Installing as a background service" below.
   it can decode the same shape without a second copy.
 - `AppPaths.swift` — where everything lives on disk for Firefox/Chrome,
   including the socket path (must match `native-host/src/socket-path.js`).
-- `AppGroupPaths.swift` — the Safari counterpart: where the App Group
-  shared container's relay files live (must match the entitlements in
-  `project.yml` and `SafariExtension/SafariWebExtensionHandler.swift`).
+- `SafariRelayPort.swift` — the Safari counterpart: the loopback port
+  number both `SafariLocalRelayServer.swift` (this target) and
+  `SafariExtension/SafariWebExtensionHandler.swift` (the sandboxed
+  extension target) agree on. Compiled into both targets (see
+  `project.yml`) so there's one source of truth for it.
 - `BlocklistStore.swift` — the live blocklist + JSON persistence. Adds
   apply instantly; removals are delegated to `FrictionController`.
-  Persists to both `AppPaths.blocklistFile` (Firefox/Chrome) and
-  `AppGroupPaths.blocklistFile` (Safari) on every change.
+  Persists to `AppPaths.blocklistFile` (Firefox/Chrome) — Safari reads
+  the in-memory `blocklist` property live over the loopback relay
+  below, no separate file.
 - `FrictionController.swift` — the asymmetric-friction rule itself:
   pending removals wait out an owner-configurable delay (default 30
   min) and can be cancelled any time before they apply.
@@ -37,10 +41,12 @@ run under `launchd` — see "Installing as a background service" below.
   that native-host connects to (Firefox/Chrome only).
 - `HeartbeatMonitor.swift` — tracks when the extension last checked in,
   fed by all three browsers' transports.
-- `SafariHeartbeatWatcher.swift` — polls `AppGroupPaths.heartbeatFile`
-  (written by the sandboxed Safari extension target) and feeds new
-  timestamps into `HeartbeatMonitor`, since there's no socket message to
-  listen for on that side — see `docs/PROTOCOL.md`'s "Safari's transport".
+- `SafariLocalRelayServer.swift` — the Safari counterpart to
+  `MessagingServer.swift`: a loopback-only TCP listener
+  (`SafariRelayPort.swift`) the sandboxed Safari extension target
+  connects to once per `beginRequest()`, since there's no socket
+  message to listen for on that side — see `docs/PROTOCOL.md`'s
+  "Safari's transport".
 - `FirefoxEnforcer.swift` / `SafariEnforcer.swift` — each knows how to
   find and quit exactly one browser, nothing else.
 - `EnforcementController.swift` — every 30s, if a browser is running and
@@ -56,7 +62,8 @@ run under `launchd` — see "Installing as a background service" below.
   own native code (not part of the `YTRestrictor` app target — see
   "Safari Web Extension" below):
   - `SafariWebExtensionHandler.swift` — the one entry point Safari calls
-    into (`beginRequest`); reads/writes the App Group relay files.
+    into (`beginRequest`); connects to `SafariLocalRelayServer` over
+    loopback TCP for the heartbeat + blocklist round trip.
   - `Info.plist` — the `NSExtension` declaration Safari requires.
 
 ## Running it locally

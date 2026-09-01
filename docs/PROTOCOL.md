@@ -128,23 +128,47 @@ unlike `native-host/` and `menubar-app/`, which are deliberately
 unsandboxed so they can use a plain Unix domain socket). A sandboxed
 process can't open an arbitrary path like
 `~/Library/Application Support/YTRestrictor/host.sock`. Instead,
-`menubar-app`'s app target and its Safari Web Extension target share an
-[App Group](https://developer.apple.com/documentation/xcode/configuring-app-groups)
-container (`group.com.stage-ria.ytrestrictor` — see
-`menubar-app/project.yml`), and relay through two small files there
-instead of the socket:
+`SafariWebExtensionHandler` connects out to a small loopback-only TCP
+listener the main app runs (`SafariLocalRelayServer.swift`, port in
+`SafariRelayPort.swift`) — one connection per `beginRequest()`: the
+extension sends `{"type": "heartbeat"}` and half-closes, the relay
+server records the heartbeat straight into the same `HeartbeatMonitor`
+Firefox/Chrome report to (it's running in-process, not IPC) and writes
+back the current blocklist read live from `BlocklistStore`, then
+closes.
 
-- `safari-blocklist.json` — written by `BlocklistStore` (mirrors
-  `blocklist.json` under Application Support) every time the blocklist
-  changes; read by `beginRequest()` to build its `blocklist-update`
-  response.
-- `safari-heartbeat.json` — written by `beginRequest()` every time a
-  `heartbeat` arrives; polled by `SafariHeartbeatWatcher` (menubar-app's
-  main process, not sandboxed) roughly every 15s and fed into the same
-  `HeartbeatMonitor` Firefox and Chrome already report to — so stale
-  detection and quit-the-browser enforcement work identically across
-  all three, just via a polled file instead of a live socket message on
-  Safari's side.
+This used to be an [App
+Group](https://developer.apple.com/documentation/xcode/configuring-app-groups)
+shared container (`group.com.stage-ria.ytrestrictor`) instead — a
+`safari-blocklist.json` file `BlocklistStore` wrote on every edit, plus
+a Darwin notification for the heartbeat. That was replaced entirely:
+macOS's `kTCCServiceSystemPolicyAppData` check ("...would like to
+access data from other apps") re-prompts for App Group container
+access on **every single launch** of a process signed with a
+development (non–Apple-Developer-Program) certificate, regardless of
+how rarely the container is actually touched — confirmed by watching
+`tccd` re-prompt twice in a row against the same unchanged, already-
+running binary, no rebuild in between. A loopback TCP connection has no
+such gate: sandboxed apps are allowed to make outgoing connections
+silently via the `com.apple.security.network.client` entitlement,
+granted at code-signing time with no runtime consent prompt at all, at
+any frequency. Net effect: zero owner-facing prompts, ever, without
+needing a paid Apple Developer Program membership. See git history
+(commits around September 2026) for the full App Group version if
+you're debugging something that assumes it still exists.
+
+One build-tooling gotcha this surfaced: `xcodebuild`'s own
+`RegisterWithLaunchServices` step registers the DerivedData copy of the
+Safari Web Extension with `pluginkit` as a side effect of every build.
+Left alone, that produces two registrations of the same extension
+bundle ID, and Safari has been observed resolving to whichever it saw
+first — silently running stale code no matter how many times
+`scripts/package-menubar-app-xcode.sh` rebuilds
+`menubar-app/build/YTRestrictor.app`. That script now explicitly
+unregisters the DerivedData copy and registers the installed one via
+`pluginkit -r`/`pluginkit -a` after every build — see the script for
+why both calls are needed (macOS's own auto-discovery of the new copy
+is asynchronous and isn't guaranteed to have run yet).
 
 This is a deliberate adaptation of the same message shapes to a
 transport Apple actually supports for Safari Web Extensions, not a

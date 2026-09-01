@@ -42,8 +42,8 @@ Operating instructions for any agent working in this repository. Read
      also the Safari Web Extension's *container app* (Safari Web
      Extensions must ship embedded inside a native app bundle) — its
      `SafariExtension/` target is still governed by this same modularity
-     principle: it's a thin relay (App Group shared-container reads/
-     writes only, mirroring `native-host/`'s "no blocklist logic" rule),
+     principle: it's a thin relay (a loopback-only TCP connection to the
+     main app, mirroring `native-host/`'s "no blocklist logic" rule),
      never a second place blocklist or friction logic lives.
    - Within each component, split further: detection logic, matching
      logic, and UI/presentation should be separate files/modules, each
@@ -97,7 +97,7 @@ Operating instructions for any agent working in this repository. Read
 ├── .gitignore
 ├── docs/
 │   ├── PROTOCOL.md          # message schema, versioned (native-messaging JSON
-│   │                        # for Firefox/Chrome, App Group file relay for Safari)
+│   │                        # for Firefox/Chrome, loopback TCP relay for Safari)
 │   └── HOW-IT-WORKS.md      # architecture overview
 ├── shared/                  # detect/match/block/messaging logic, all three browsers
 │   ├── detect/              # player detection (native + embedded)

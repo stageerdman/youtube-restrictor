@@ -24,14 +24,6 @@ final class BlocklistStore: ObservableObject {
         friction.onApply = { [weak self] kind, value in
             self?.applyRemoval(kind: kind, value: value)
         }
-        // Backfill the App Group copy on every launch, not just on the
-        // next edit — otherwise a freshly (re)launched app leaves Safari
-        // reading a stale or missing safari-blocklist.json until the
-        // owner happens to change something, even though AppPaths.
-        // blocklistFile (Firefox/Chrome's copy) already has the real
-        // data. Doesn't broadcast over the socket — messagingServer has
-        // no clients yet at this point; AppCoordinator's
-        // onClientConnected already handles that push separately.
         persist()
     }
 
@@ -97,16 +89,6 @@ final class BlocklistStore: ObservableObject {
         AppPaths.ensureSupportDirectoryExists()
         guard let data = try? JSONEncoder.ytRestrictor.encode(blocklist) else { return }
         try? data.write(to: AppPaths.blocklistFile, options: .atomic)
-
-        // Safari can't reach AppPaths.blocklistFile (sandboxed) or the
-        // socket messagingServer just broadcast on — it polls this App
-        // Group copy instead, on its own next heartbeat. See
-        // docs/PROTOCOL.md's "Safari's transport". Best-effort: a
-        // missing/misconfigured App Group entitlement just means Safari
-        // won't see this update, not a crash here.
-        if let url = AppGroupPaths.blocklistFile {
-            try? data.write(to: url, options: .atomic)
-        }
     }
 
     private static func load() -> Blocklist {

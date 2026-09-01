@@ -28,13 +28,13 @@ Chrome                    native-host                        │ same
 └──────────────┘         └──────────────┘                     │
                                                                  │
 Safari                    SafariWebExtensionHandler              │
-┌──────────────┐ sendNat. ┌──────────────┐  App Group          │
-│  extension    │◄────────►│  .appex,     │◄─shared files───────┘
-│  (content +   │iveMessage│  sandboxed,  │  (safari-heartbeat.json,
-│  service      │ (request/│  embedded in │   safari-blocklist.json —
-│  worker)      │ response │  YTRestrictor│   not a socket, see
-│               │  only)   │  .app)       │   docs/PROTOCOL.md)
-└──────────────┘          └──────────────┘
+┌──────────────┐ sendNat. ┌──────────────┐  loopback           │
+│  extension    │◄────────►│  .appex,     │◄─TCP────────────────┘
+│  (content +   │iveMessage│  sandboxed,  │  (127.0.0.1 only,
+│  service      │ (request/│  embedded in │   one connection per
+│  worker)      │ response │  YTRestrictor│   request — not a
+│               │  only)   │  .app)       │   shared container,
+└──────────────┘          └──────────────┘   see docs/PROTOCOL.md)
 ```
 
 - **The extension** runs inside the browser. It detects YouTube players
@@ -67,8 +67,8 @@ Safari                    SafariWebExtensionHandler              │
   everything except the Safari extension target itself (SPM can't build
   App Extension bundle products).
 
-Message shapes for the stdio/socket link (Firefox, Chrome) and the App
-Group file relay (Safari) are both in `docs/PROTOCOL.md`. Firefox/Chrome
+Message shapes for the stdio/socket link (Firefox, Chrome) and the
+loopback TCP relay (Safari) are both in `docs/PROTOCOL.md`. Firefox/Chrome
 messages are "fire and forget" JSON, not request/response. Safari's are
 necessarily request/response — see `docs/PROTOCOL.md`'s "Safari's
 transport" section for why, and what that changes about *when*
@@ -92,12 +92,15 @@ and Chrome's, not just a third manifest dialect:
    `native-host/` and `menubar-app/`, which are deliberately
    unsandboxed so they can open a plain Unix domain socket wherever
    they like. A sandboxed process can't reach
-   `~/Library/Application Support/YTRestrictor/host.sock`. The
-   Apple-sanctioned way for a sandboxed extension and its container app
-   to share data is an **App Group** shared container — a plain
-   directory both processes can read/write, not a live IPC channel — so
-   the relay is two small JSON files, not a socket. Details in
-   `docs/PROTOCOL.md`.
+   `~/Library/Application Support/YTRestrictor/host.sock` (an arbitrary
+   filesystem path). It *can* open an outgoing network connection with
+   the right entitlement, though — including to `127.0.0.1` — so the
+   relay is a small loopback-only TCP listener the main app runs
+   instead, not a shared container. (An earlier version used an App
+   Group shared container for this; that was replaced because macOS
+   re-prompts for cross-container access on every launch of a
+   development-signed build — see `docs/PROTOCOL.md`'s "Safari's
+   transport" for the full story.) Details in `docs/PROTOCOL.md`.
 3. **Must ship embedded inside a container app.** Safari Web Extensions
    can't be loaded standalone the way Firefox's temporary add-ons or
    Chrome's unpacked extensions can — they have to be an App Extension
@@ -317,17 +320,14 @@ UX in the whole project that's deliberately *not* frictionless — see
   distribution/policies.json` — lives *inside the app bundle*, so a Zen
   update that replaces the bundle wipes it; re-run
   `scripts/install-policy.sh` after any Zen update.
-- **App Group shared container (Safari only)**: `~/Library/Group
-  Containers/group.com.stage-ria.ytrestrictor/` — holds
-  `safari-heartbeat.json` and `safari-blocklist.json`, written/read by
-  `menubar-app/SafariExtension/SafariWebExtensionHandler.swift` (the
-  sandboxed side) and `menubar-app/Sources/YTRestrictor/
-  SafariHeartbeatWatcher.swift` / `BlocklistStore.swift` (the
-  unsandboxed side). Both targets declare the same App Group identifier
-  in their entitlements — see `menubar-app/project.yml`. This directory
-  is separate from `~/Library/Application Support/YTRestrictor/`
-  (Firefox/Chrome's blocklist + socket) — Safari can't reach that path
-  at all, being sandboxed, so it gets its own.
+- **Safari's relay (loopback TCP, not a file)**: no on-disk state at
+  all — `menubar-app/SafariExtension/SafariWebExtensionHandler.swift`
+  (the sandboxed side) connects to `127.0.0.1:47813` (see
+  `menubar-app/Sources/YTRestrictor/SafariRelayPort.swift`), where
+  `SafariLocalRelayServer.swift` (the unsandboxed side, wired up in
+  `AppCoordinator.swift`) answers with the live in-memory blocklist.
+  Nothing under `~/Library/Group Containers/` or `~/Library/Application
+  Support/YTRestrictor/` is Safari-specific.
 
 ## Build order, if you're picking this up cold
 

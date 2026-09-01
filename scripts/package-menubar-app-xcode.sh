@@ -54,4 +54,40 @@ rm -rf "$APP_BUNDLE"
 mkdir -p "$MENUBAR_DIR/build"
 cp -R "$BUILT_PRODUCTS_DIR/YTRestrictor.app" "$APP_BUNDLE"
 
+# xcodebuild's own RegisterWithLaunchServices step (part of `build`
+# above) registers the DerivedData copy's Safari Web Extension with
+# pluginkit as a side effect, every single time. Left alone, that
+# leaves two registrations of the same extension bundle ID — the stale
+# DerivedData one and the one at $APP_BUNDLE this script just produced
+# — and Safari has been observed resolving to whichever one it
+# happens to pick, silently running old code no matter how many times
+# this script rebuilds $APP_BUNDLE.
+#
+# A single pluginkit -r/-a pass isn't reliable here: lsregister's own
+# registration (triggered by the `xcodebuild build` above) finishes
+# asynchronously, sometimes *after* this script's own cleanup runs, and
+# silently re-adds the DerivedData copy behind our back. Loop until
+# `pluginkit -m` settles on exactly the one copy we want, rather than
+# assuming one pass wins the race.
+DERIVED_DATA_APPEX="$BUILT_PRODUCTS_DIR/YTRestrictor Safari Extension.appex"
+INSTALLED_APPEX="$APP_BUNDLE/Contents/PlugIns/YTRestrictor Safari Extension.appex"
+BUNDLE_ID="com.stage-ria.ytrestrictor-app.safari-extension"
+for attempt in 1 2 3 4 5; do
+  if [ -e "$DERIVED_DATA_APPEX" ]; then
+    pluginkit -r "$DERIVED_DATA_APPEX" 2>/dev/null || true
+  fi
+  pluginkit -a "$INSTALLED_APPEX" 2>/dev/null || true
+  sleep 1
+  REGISTERED_PATHS="$(pluginkit -m -v -i "$BUNDLE_ID" 2>/dev/null | awk '{print $NF}')"
+  if [ "$REGISTERED_PATHS" = "$INSTALLED_APPEX" ]; then
+    break
+  fi
+  if [ "$attempt" = 5 ]; then
+    echo "warning: could not get pluginkit to settle on $INSTALLED_APPEX alone" >&2
+    echo "         (currently registered: $REGISTERED_PATHS) — Safari may still" >&2
+    echo "         resolve a stale build. Re-run this script, or manually run:" >&2
+    echo "         pluginkit -r \"$DERIVED_DATA_APPEX\"; pluginkit -a \"$INSTALLED_APPEX\"" >&2
+  fi
+done
+
 echo "Packaged (code-signed, Safari extension embedded): $APP_BUNDLE"

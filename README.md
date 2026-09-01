@@ -46,8 +46,9 @@ Detection, blocking, and messaging to the same menu bar app all work
 support the stdio native-messaging model Firefox/Chrome use at all —
 `menubar-app/` itself had to become the Safari extension's container
 app (an Xcode project now, alongside the still-working `Package.swift`)
-and messages relay through a sandboxed App Extension and an App Group
-shared container instead of the socket `native-host/` uses. See
+and messages relay through a sandboxed App Extension talking to a
+loopback-only TCP connection instead of the socket `native-host/` uses.
+See
 `docs/PROTOCOL.md`'s "Safari's transport" section and
 `docs/HOW-IT-WORKS.md` for exactly why and what that changes. Like
 Chrome, Safari only has a normal, removable install — enabled per
@@ -208,7 +209,6 @@ rm -rf menubar-app/build/YTRestrictor.app
 rm /Applications/Zen.app/Contents/Resources/distribution/policies.json
 rm "$HOME/Library/Application Support/Mozilla/NativeMessagingHosts/com.stage_ria.ytrestrictor.json"
 rm "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.stage_ria.ytrestrictor.json"
-rm -rf "$HOME/Library/Group Containers/group.com.stage-ria.ytrestrictor"
 ```
 
 Then remove the extension normally from `about:addons` in Zen,

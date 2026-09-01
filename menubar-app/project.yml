@@ -16,10 +16,15 @@
 #     from shared/ by scripts/sync-shared-extension-sources.sh — run that
 #     before generating/building, same as any other build.
 #
-# Both targets share an App Group (group.com.stage-ria.ytrestrictor) —
+# The extension target reaches the app target over a loopback-only TCP
+# connection (SafariRelayPort.swift / SafariLocalRelayServer.swift) —
 # the relay mechanism docs/PROTOCOL.md's "Safari's transport" section
 # describes, since the sandboxed extension can't reach the Unix socket
-# native-host/ and Firefox/Chrome use.
+# native-host/ and Firefox/Chrome use. Not an App Group: an earlier
+# version of this used a shared App Group container instead, but macOS
+# re-prompts for cross-container access on every single launch of a
+# development-signed (non-Apple-Developer-Program) process — see git
+# history and docs/PROTOCOL.md for why that was replaced.
 name: YTRestrictor
 options:
   deploymentTarget:
@@ -61,8 +66,6 @@ targets:
       path: YTRestrictor.entitlements
       properties:
         com.apple.security.app-sandbox: false
-        com.apple.security.application-groups:
-          - group.com.stage-ria.ytrestrictor
     dependencies:
       - target: YTRestrictorSafariExtension
         embed: true
@@ -73,7 +76,7 @@ targets:
     deploymentTarget: "13.0"
     sources:
       - path: SafariExtension/SafariWebExtensionHandler.swift
-      - path: Sources/YTRestrictor/AppGroupPaths.swift
+      - path: Sources/YTRestrictor/SafariRelayPort.swift
       - path: Sources/YTRestrictor/Blocklist.swift
       - path: Sources/YTRestrictor/NativeMessage.swift
       - path: ../extension-safari/manifest.json
@@ -110,8 +113,12 @@ targets:
       path: SafariExtension/YTRestrictorSafariExtension.entitlements
       properties:
         com.apple.security.app-sandbox: true
-        com.apple.security.application-groups:
-          - group.com.stage-ria.ytrestrictor
+        # Needed to open the loopback TCP connection to
+        # SafariLocalRelayServer — see SafariRelayPort.swift and
+        # docs/PROTOCOL.md's "Safari's transport". Sandboxed apps can't
+        # make outgoing connections at all without this; it's granted
+        # silently at code-signing time, no runtime consent prompt.
+        com.apple.security.network.client: true
 
 schemes:
   YTRestrictor:
