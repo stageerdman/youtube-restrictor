@@ -178,7 +178,11 @@ Chrome are unaffected either way and need none of this.
    through Safari's own UI instead of a policy file; see
    `docs/HOW-IT-WORKS.md` for why there's no lockdown-equivalent here).
    This resets every time Safari restarts, same as Firefox's temporary
-   add-on install.
+   add-on install — see `docs/HOW-IT-WORKS.md`'s heartbeat section for
+   why this is Apple's own restriction on unsigned extensions (not
+   fixable from this repo without paid notarization), the false-positive
+   kill-loop bug it can trigger in `SafariEnforcer`, and a documented-
+   but-not-yet-built idea for automating the toggle instead of paying.
 2. Safari → Settings → **Extensions** → check the box next to "YouTube
    Restrictor" to turn it on, and grant it permission for
    `youtube.com` (and "All Websites" if you want embed detection on

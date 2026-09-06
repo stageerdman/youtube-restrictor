@@ -273,6 +273,70 @@ already depend on — out of scope for "add Safari support." Worth
 prioritizing if more than one of these browsers is ever open at once in
 practice.
 
+**Known bug, found 2026-09-06, not yet fixed:** `SafariEnforcer` has no
+way to tell "the owner disabled the extension to dodge blocking" apart
+from "the Safari extension was never actually running in the first
+place." `EnforcementController.check()` only looks at
+`SafariEnforcer.isSafariRunning()` (is `com.apple.Safari` running at
+all) and `heartbeatMonitor.isStale` (no heartbeat in 5 minutes) — it has
+no concept of "has a heartbeat from Safari ever arrived." Two ways this
+fires with nothing to do with circumvention:
+- `scripts/package-menubar-app.sh` (the *default* packaging script, run
+  by plain `scripts/build.sh` / `scripts/install-launch-agent.sh` with
+  no `--xcode` flag) produces a build with **no Safari extension
+  embedded at all** — Firefox/Chrome only, by design. If that build is
+  installed as the LaunchAgent, `SafariEnforcer` still runs and will
+  force-quit Safari every ~30s the moment it's opened, forever, since
+  no heartbeat can ever arrive. This isn't hypothetical — it's exactly
+  what happened here: a `--xcode` Safari-enabled build got silently
+  replaced by a plain rebuild partway through dev work, and the owner
+  had no indication why Safari kept dying.
+- Even with the right (`--xcode`) build installed, a macOS App
+  Extension's `pluginkit` registration can be lost as a side effect of
+  routine rebuilds/DerivedData churn (see `scripts/package-menubar-
+  app-xcode.sh`'s own pluginkit-settling retry loop) — again, nothing
+  the owner did on purpose.
+Per `CLAUDE.md` principle 2/3 (defeatable only by *deliberate* action,
+friction only via *visible* deliberate UX), an infrastructure hiccup
+silently triggering the same violent response as intentional bypass is
+a gap, not correct behavior. Not fixed yet — candidate fix is gating
+`SafariEnforcer` on "has this process instance ever recorded one real
+Safari heartbeat" rather than firing unconditionally the instant Safari
+is open and the global timestamp is stale.
+
+**Known limitation, not fixed, workaround only documented so far:**
+Safari's own "Allow Unsigned Extensions" developer toggle (Settings →
+Developer) resets to off every time Safari fully quits — this is
+Apple's behavior for any extension signed with a free "Apple
+Development" personal-team certificate (what `project.yml`'s
+`DEVELOPMENT_TEAM` uses here), not something this repo controls. There
+is no `defaults write`/entitlement override; the only way to make a
+Safari Web Extension persist across restarts without re-toggling by
+hand is a paid Apple Developer Program membership ($99/yr) + a
+Developer ID Application certificate + notarizing the built `.app`
+(`xcrun notarytool submit` + staple) instead of the current ad-hoc/
+personal-team signing. Not built, since it costs money and the owner
+hasn't opted in yet.
+
+Discussed alternative, also not built yet: automate the manual toggle
+instead of paying for notarization — a small addition to `menubar-app/`
+that listens for Safari's launch (the same kind of `NSWorkspace`
+notification `HeartbeatMonitor`/`SafariEnforcer` already care about)
+and drives Safari's own Settings UI via Accessibility (`System Events`-
+style UI scripting) to flip "Allow Unsigned Extensions" back on
+automatically. This would still be the owner's own action, just
+automated rather than manual, so it doesn't conflict with principle 2/3
+above — but it comes with real caveats worth weighing before building
+it: it requires granting the automation one-time Accessibility
+permission (a broad system permission), it's inherently fragile (driven
+by Safari's UI layout, which can change across macOS/Safari versions
+and silently stop working with no error), and there's a short race
+window right at Safari launch, before the toggle fires, during which
+the extension would still appear disabled. Revisit this together with
+the `SafariEnforcer` false-positive bug above — a flaky auto-toggle
+still needs the enforcement side to fail safe (warn, don't just
+force-quit) rather than assuming the toggle always lands in time.
+
 ## Asymmetric friction, concretely
 
 `BlocklistStore.swift` applies additions synchronously — no
