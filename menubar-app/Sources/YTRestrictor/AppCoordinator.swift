@@ -12,6 +12,13 @@ final class AppCoordinator: ObservableObject {
     let heartbeatMonitor = HeartbeatMonitor()
     private let messagingServer = MessagingServer()
     private let enforcementController: EnforcementController
+    // Independent of enforcementController: that one enforces stale
+    // heartbeats from browsers this project has an extension for. This
+    // one enforces the absence of any extension at all — any other
+    // browser Launch Services recognizes as one — so it needs no
+    // heartbeat state and runs on its own schedule. See
+    // UnsupportedBrowserController's doc comment.
+    private let unsupportedBrowserController = UnsupportedBrowserController()
     // Safari's counterpart to messagingServer — see
     // SafariLocalRelayServer's doc comment and docs/PROTOCOL.md's
     // "Safari's transport". Answers both the heartbeat and the

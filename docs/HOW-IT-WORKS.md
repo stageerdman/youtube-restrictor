@@ -222,24 +222,66 @@ outright just means deleting `YTRestrictor.app` (the same app the owner
 would delete to remove the menu bar app entirely) — there's nothing
 Safari-specific left over.
 
+## Unsupported browsers: quit on sight
+
+The heartbeat mechanism below only ever checks in a browser this
+project already ships an extension for — it has nothing to say about a
+brand-new browser the owner just downloaded that has no extension at
+all. `UnsupportedBrowserController` (wired up in `AppCoordinator.swift`)
+exists to cover exactly that gap: a 30s periodic sweep plus an
+`NSWorkspace.didLaunchApplicationNotification` observer (so a freshly
+launched browser gets caught within moments, not up to 30s later) both
+call `UnsupportedBrowserEnforcer.runningUnsupportedBrowsers()`, which
+force-quits (graceful `terminate()`, then `forceTerminate()` after 3s
+if it's still around — same pattern as `FirefoxEnforcer`/
+`SafariEnforcer`) anything that's in `KnownBrowsers.all` (a hand-
+maintained set of browser bundle identifiers — see that file's own doc
+comment for why it's hand-maintained rather than auto-detected: an
+earlier attempt using Launch Services' "which apps can open https
+URLs" registry produced a real false positive, flagging BetterTouchTool
+as a browser) but *not* in
+`UnsupportedBrowserEnforcer.supportedBundleIdentifiers` (the browsers
+with a real extension: Firefox/Zen, Chrome, Brave, Safari). There's
+deliberately no grace period here, unlike the heartbeat's 5-minute
+window — per `CLAUDE.md` principle 3 ("tightening restrictions is
+instant"), there's no existing extension to ever check in for these,
+so nothing to wait on. A wrong or missing bundle ID in `KnownBrowsers.all`
+just fails to match anything (safe failure mode), and per `CLAUDE.md`
+principle 2 this only ever quits the browser process itself — never
+touches the app bundle or the download — so it's fully undone the same
+way every other mechanism here is, by removing `YTRestrictor.app` and
+its LaunchAgent.
+
+**Brave reuses Chrome's extension, not a new one.** Brave is Chromium
+under the hood, so it loads `extension-chrome/` unpacked exactly as
+Chrome does — no `extension-brave/` directory, no `shared/` changes,
+no code differences at all. It needs its own native-messaging host
+registration only because Brave keeps its own `NativeMessagingHosts`
+directory that doesn't read Chrome's (see "Where state actually lives"
+below) — `scripts/install-native-host-brave.sh` handles that, and
+`com.brave.Browser` is in `supportedBundleIdentifiers` above. Before
+that script has been run and the extension loaded, a running Brave
+looks exactly like any other unsupported browser to the mechanism
+above and gets quit — that's expected, not a bug.
+
 ## The heartbeat, and why it exists
 
 The extension pings `heartbeat` every 60s regardless of what's playing
-— over the native-messaging link for Firefox/Chrome, via
+— over the native-messaging link for Firefox/Chrome/Brave, via
 `sendNativeMessage` for Safari (see `docs/PROTOCOL.md`'s "Safari's
 transport"). `HeartbeatMonitor` in the menu bar app just tracks "when
 did I last hear from the extension" — one shared instance, fed by all
-three browsers' transports alike. If Zen is running and 5 minutes pass
+four browsers' transports alike. If Zen is running and 5 minutes pass
 with no heartbeat, `EnforcementController` quits Zen via
 `FirefoxEnforcer`; the same check runs for Safari via `SafariEnforcer`
 (bundle identifier `com.apple.Safari`, quit the same graceful-then-force
 way). This exists so that disabling the extension (rather than
 uninstalling it, which the policy already blocks for Firefox/Zen) 
 doesn't quietly restore unrestricted YouTube access — it forces the
-browser closed instead, which is very noticeable. Chrome still has no
-enforcement wired up on this axis (heartbeat monitoring, yes;
-quit-on-stale, no) — that gap predates Safari support and is unrelated
-to it.
+browser closed instead, which is very noticeable. Chrome and Brave
+still have no enforcement wired up on this axis (heartbeat monitoring,
+yes; quit-on-stale, no) — that gap predates Safari support (and Brave
+support) and is unrelated to either.
 
 This is *not* configurable from the UI (no stepper, unlike the removal
 delay) — see `INIT.md` Phase 5. If that's ever revisited, treat it as a
@@ -257,19 +299,21 @@ than fixed, since fixing it means editing `menubar-app/`. Chrome would
 need its own equivalent bundle-ID check (`com.google.Chrome`) added
 alongside whatever the Zen fix ends up being, once that's prioritized.
 
-**Known limitation, made more visible by adding Safari, not yet fixed:**
-`HeartbeatMonitor` is a single global "when did I last hear a heartbeat
-from *any* browser" timestamp, not one per browser. `EnforcementController`
-gates its Firefox check on `isFirefoxRunning()`, so today, with only
-Firefox and Chrome, a live Chrome heartbeat can mask a dead Firefox one
-being open at the same time — `heartbeatMonitor.isStale` reads `false`
-(because Chrome just checked in) even though Firefox's own extension
-may have silently stopped. Adding Safari as a third source makes this
-three-way instead of two-way but doesn't introduce it. Not fixed here
-since it means changing `HeartbeatMonitor`/`MessagingServer` to track a
+**Known limitation, made more visible by adding Safari (and now Brave),
+not yet fixed:** `HeartbeatMonitor` is a single global "when did I last
+hear a heartbeat from *any* browser" timestamp, not one per browser.
+`EnforcementController` gates its Firefox check on `isFirefoxRunning()`,
+so today, with Firefox, Chrome, and Brave all in the mix, a live
+Chrome-or-Brave heartbeat can mask a dead Firefox one being open at the
+same time — `heartbeatMonitor.isStale` reads `false` (because Chrome or
+Brave just checked in) even though Firefox's own extension may have
+silently stopped. Adding Safari and Brave as further sources makes this
+worse, not better, but doesn't introduce it. Not fixed here since it
+means changing `HeartbeatMonitor`/`MessagingServer` to track a
 per-source timestamp (tagging each heartbeat with which transport it
 arrived over), which is a real design change to code Firefox and Chrome
-already depend on — out of scope for "add Safari support." Worth
+already depend on — out of scope for "add Safari support" and equally
+out of scope for "add Brave support." Worth
 prioritizing if more than one of these browsers is ever open at once in
 practice.
 
@@ -378,6 +422,13 @@ UX in the whole project that's deliberately *not* frictionless — see
     extension's absolute install path, which this script computes —
     see the script's own header comment for why that's flagged as
     unverified rather than asserted correct.
+  - Brave: `~/Library/Application Support/BraveSoftware/Brave-Browser/
+    NativeMessagingHosts/com.stage_ria.ytrestrictor.json`, written by
+    `scripts/install-native-host-brave.sh` — a near-duplicate of the
+    Chrome script (same ID-derivation algorithm, since Brave is
+    Chromium), pointed at Brave's own registration directory and at
+    `extension-chrome/`'s path (Brave has no extension directory of its
+    own to point at — see "Brave reuses Chrome's extension" below).
 - **LaunchAgent plist**:
   `~/Library/LaunchAgents/com.stage-ria.ytrestrictor-app.plist`.
 - **Firefox/Zen policy**: `/Applications/Zen.app/Contents/Resources/

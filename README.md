@@ -8,7 +8,7 @@ this repo is developed.
 
 ## How it works (eventually)
 
-- A **browser extension** — Firefox/Zen, Chrome, and Safari all
+- A **browser extension** — Firefox/Zen, Chrome, Brave, and Safari all
   supported — watches for YouTube playback and checks it against a
   blocklist.
 - A **macOS menu bar app** holds that blocklist, the same one either
@@ -39,6 +39,18 @@ not exist yet for Chrome — it needs a different mechanism (a signed
 `.crx` + a root-owned policy file) that hasn't been built. Until then,
 Chrome only has a normal, removable "unpacked" install.
 
+**Brave reuses Chrome's extension as-is.** Brave is Chromium under the
+hood and loads `extension-chrome/` unpacked directly — no
+`extension-brave/` directory, no code differences. It gets its own
+native-messaging host registration (a separate `NativeMessagingHosts`
+directory, same as Firefox/Chrome each keeping their own) and, like
+Chrome, no force-install lockdown yet — a normal, removable "unpacked"
+install. Also worth knowing: `menubar-app/`'s "any other browser gets
+force-quit until it has an extension" mechanism (see
+`docs/HOW-IT-WORKS.md`'s "Unsupported browsers" section) is what used
+to force-quit Brave before this support existed, and stops doing so now
+that Brave is in this list.
+
 **Safari support is newer too, and structurally can't be locked down
 the same way as Firefox/Zen — nor can any browser be, without MDM.**
 Detection, blocking, and messaging to the same menu bar app all work
@@ -65,9 +77,10 @@ Safari's own Settings → Extensions toggle. See "Setup" below, or
 - `extension-chrome/` — the Chrome extension (Manifest V3).
 - `extension-safari/` — the Safari extension (Manifest V3); also
   embedded into `menubar-app/` as the Safari Web Extension's Resources.
-- `native-host/` — the native-messaging bridge for Firefox/Chrome (thin
-  stdio↔socket pipe, no blocklist logic — see `native-host/README.md`).
-  Safari has no equivalent — see `docs/HOW-IT-WORKS.md`.
+- `native-host/` — the native-messaging bridge for Firefox/Chrome/Brave
+  (thin stdio↔socket pipe, no blocklist logic — see
+  `native-host/README.md`). Safari has no equivalent — see
+  `docs/HOW-IT-WORKS.md`.
 - `menubar-app/` — the SwiftUI menu bar app that owns the blocklist and
   the asymmetric-friction rules, the same one all three extensions talk
   to — see `menubar-app/README.md`. Also the Safari Web Extension's
@@ -169,6 +182,45 @@ process when idle, a blocklist change you make in the app can take up
 to about a minute to reach an already-open Chrome tab, instead of
 arriving instantly like it does in Zen (see `docs/PROTOCOL.md` for why).
 
+### Brave (not locked down yet, reuses the Chrome extension)
+
+Brave detection, blocking, and talking to the same menu bar app all
+work, using the *same* `extension-chrome/` folder Chrome uses — Brave
+is Chromium under the hood and loads it unpacked without any changes.
+Like Chrome, there's no force-install lockdown yet.
+
+1. Register the native-messaging link (a separate registration from
+   Chrome's — Brave keeps its own `NativeMessagingHosts` directory and
+   doesn't read Chrome's):
+   ```
+   ./scripts/install-native-host-brave.sh
+   ```
+   This computes the extension's ID from its install path and prints
+   it, the same way the Chrome script does. Keep that terminal output
+   around for the next step.
+2. Open `brave://extensions`, turn on **Developer mode** (top right),
+   click **Load unpacked**, and select the `extension-chrome/` folder
+   from this repo (yes, the Chrome one — there is no `extension-brave/`).
+3. Check the ID Brave shows for it against what step 1 printed. If they
+   don't match, re-run step 1 with the real one:
+   `./scripts/install-native-host-brave.sh <the-real-ID>`.
+4. Make sure the menu bar app is running (see the Zen setup above if
+   you haven't installed it yet — it's the same app, shared by every
+   browser). Open a YouTube tab in Brave and check the console
+   (`Cmd+Option+J`) for `[YT Restrictor]` log lines.
+
+Because this isn't locked down, `brave://extensions` can remove it with
+one click at any time — same as Chrome's unpacked install. It has the
+same idle-suspend quirk as Chrome: a blocklist change can take up to
+about a minute to reach an already-open Brave tab (see
+`docs/PROTOCOL.md` for why).
+
+If you load a brand-new browser (Brave included) *before* running its
+install script above, `menubar-app/`'s unsupported-browser check will
+force-quit it on sight — see `docs/HOW-IT-WORKS.md`'s "Unsupported
+browsers" section. That's expected, not a bug: it stops the moment
+Brave's bundle identifier is in the supported list, which it now is.
+
 ### Safari (not locked down, and structurally can't be the same way)
 
 Safari Web Extensions need more setup than Firefox/Chrome because
@@ -209,13 +261,14 @@ rm -rf menubar-app/build/YTRestrictor.app
 rm /Applications/Zen.app/Contents/Resources/distribution/policies.json
 rm "$HOME/Library/Application Support/Mozilla/NativeMessagingHosts/com.stage_ria.ytrestrictor.json"
 rm "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.stage_ria.ytrestrictor.json"
+rm "$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts/com.stage_ria.ytrestrictor.json"
 ```
 
 Then remove the extension normally from `about:addons` in Zen,
-`chrome://extensions` in Chrome, and/or Safari → Settings →
-Extensions. There's no hidden step and nothing left behind that
-requires special tools — this is a self-control tool, not something
-designed to resist you.
+`chrome://extensions` in Chrome, `brave://extensions` in Brave, and/or
+Safari → Settings → Extensions. There's no hidden step and nothing left
+behind that requires special tools — this is a self-control tool, not
+something designed to resist you.
 
 ## For developers: trying the Firefox/Zen extension without installing anything
 
@@ -236,12 +289,15 @@ install scripts above:
 
 This temporary install is unlocked (no policy lockdown) and resets when
 Firefox/Zen restarts — it's for development only. For the real,
-persistent setup, use the "Setup" section above. (For Chrome, there's
-no separate dev-only flow — "Load unpacked" in the Chrome setup section
-above already is the lightweight iteration path, since Chrome has no
-lockdown yet to route around. For Safari, there's no lightweight flow
+persistent setup, use the "Setup" section above. (For Chrome and Brave,
+there's no separate dev-only flow — "Load unpacked" in their setup
+sections above already is the lightweight iteration path, since neither
+has a lockdown yet to route around; they even share the exact same
+`extension-chrome/` folder. For Safari, there's no lightweight flow
 either — "Allow Unsigned Extensions" + Settings → Extensions in the
 Safari setup section above already is the equivalent of an unpacked/
 temporary install, since Safari requires the signed container app
 either way.) See `scripts/build.sh` to build/lint/typecheck everything
-at once — it also re-syncs `shared/` into all three extensions first.
+at once — it also re-syncs `shared/` into all three extension source
+trees (Firefox, Chrome, Safari — Brave has none of its own to sync
+into, it loads Chrome's).
