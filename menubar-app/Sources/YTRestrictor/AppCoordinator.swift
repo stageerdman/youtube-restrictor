@@ -40,7 +40,11 @@ final class AppCoordinator: ObservableObject {
         )
         messagingServer.onMessage = { message in
             guard let type = message["type"] as? String, type == "heartbeat" else { return }
-            heartbeatMonitor.recordHeartbeat()
+            // "source" is stamped on by native-host/host.js (see its
+            // comment) — falls back to "unknown" only if a stale,
+            // not-yet-reinstalled wrapper script is still running one
+            // that predates the source tag.
+            heartbeatMonitor.recordHeartbeat(source: message["source"] as? String ?? "unknown")
         }
         // Push the current blocklist as soon as a native host connects,
         // so a freshly (re)launched extension is in sync immediately

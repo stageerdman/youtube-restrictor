@@ -189,7 +189,7 @@ private struct HeartbeatStatusView: View {
                 if heartbeat.isStale {
                     Text("Extension last checked in ")
                         + Text(heartbeat.lastHeartbeatAt, style: .relative)
-                        + Text(" — Firefox will be closed if it's running.")
+                        + Text(" — any open supported browser whose own extension has gone quiet will be closed.")
                 } else {
                     Text("Extension connected — last checked in ")
                         + Text(heartbeat.lastHeartbeatAt, style: .relative)

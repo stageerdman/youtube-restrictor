@@ -22,7 +22,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST_SCRIPT="$REPO_ROOT/native-host/host.js"
 WRAPPER_TEMPLATE="$REPO_ROOT/native-host/manifest/run-host.template.sh"
-WRAPPER_SCRIPT="$REPO_ROOT/native-host/manifest/run-host.sh"
+WRAPPER_SCRIPT="$REPO_ROOT/native-host/manifest/run-host-brave.sh"
 MANIFEST_TEMPLATE="$REPO_ROOT/native-host/manifest/host-manifest-chrome.template.json"
 TARGET_DIR="$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts"
 TARGET_FILE="$TARGET_DIR/com.stage_ria.ytrestrictor.json"
@@ -52,13 +52,15 @@ chmod +x "$HOST_SCRIPT"
 
 # Same wrapper-script rationale as install-native-host-chrome.sh: Brave
 # also spawns native-messaging hosts with a minimal environment, so
-# host.js's own shebang can't be trusted to find node. This wrapper is
-# shared with the Chrome registration (both point at the same node/
-# host.js pair) — regenerating it here is a no-op if Chrome's install
-# script already wrote the same thing.
+# host.js's own shebang can't be trusted to find node. This gets its own
+# wrapper file (not shared with Chrome's) because it needs its own
+# "--source=brave" tag — see native-host/host.js's comment and
+# HeartbeatMonitor.swift for why that matters: without it, a live Zen or
+# Chrome heartbeat would mask Brave's extension going silent.
 sed \
   -e "s#__NODE_PATH__#$NODE_PATH#" \
   -e "s#__HOST_JS_PATH__#$HOST_SCRIPT#" \
+  -e "s#__BROWSER_SOURCE__#brave#" \
   "$WRAPPER_TEMPLATE" > "$WRAPPER_SCRIPT"
 chmod +x "$WRAPPER_SCRIPT"
 

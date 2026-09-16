@@ -301,23 +301,28 @@ than fixed, since fixing it means editing `menubar-app/`. Chrome would
 need its own equivalent bundle-ID check (`com.google.Chrome`) added
 alongside whatever the Zen fix ends up being, once that's prioritized.
 
-**Known limitation, made more visible by adding Safari (and now Brave),
-not yet fixed:** `HeartbeatMonitor` is a single global "when did I last
-hear a heartbeat from *any* browser" timestamp, not one per browser.
-`EnforcementController` gates its Firefox check on `isFirefoxRunning()`,
-so today, with Firefox, Chrome, and Brave all in the mix, a live
-Chrome-or-Brave heartbeat can mask a dead Firefox one being open at the
-same time — `heartbeatMonitor.isStale` reads `false` (because Chrome or
-Brave just checked in) even though Firefox's own extension may have
-silently stopped. Adding Safari and Brave as further sources makes this
-worse, not better, but doesn't introduce it. Not fixed here since it
-means changing `HeartbeatMonitor`/`MessagingServer` to track a
-per-source timestamp (tagging each heartbeat with which transport it
-arrived over), which is a real design change to code Firefox and Chrome
-already depend on — out of scope for "add Safari support" and equally
-out of scope for "add Brave support." Worth
-prioritizing if more than one of these browsers is ever open at once in
-practice.
+**Fixed 2026-09-16 (was a known limitation):** `HeartbeatMonitor` used
+to be a single global "when did I last hear a heartbeat from *any*
+browser" timestamp, not one per browser — so with Firefox, Chrome, and
+Brave all in the mix, a live Chrome-or-Brave heartbeat masked a dead
+Firefox one being open at the same time (`heartbeatMonitor.isStale`
+read `false` because *something* just checked in, even though
+Firefox's own extension had silently stopped). This surfaced in
+practice once Brave was added and left running alongside Zen with no
+extension loaded in Brave at all: Brave's total heartbeat silence was
+invisible because Zen's heartbeat kept the shared timestamp fresh.
+Fixed by tagging every heartbeat with which browser it came from —
+`native-host/host.js` stamps a `source` field (`"firefox"`/`"chrome"`/
+`"brave"`, set by each browser's own wrapper script generated under
+`native-host/manifest/`, see `docs/PROTOCOL.md`'s `heartbeat` section)
+and `SafariLocalRelayServer` hardcodes `"safari"` (safe to trust
+directly — that transport carries nothing else). `HeartbeatMonitor` now
+tracks `lastHeartbeatBySource: [String: Date]`, and
+`EnforcementController` checks each running browser against its own
+source's staleness instead of one shared value. The menu bar UI's
+single connection dot still shows a global "most recent across all
+sources" view (`HeartbeatMonitor.isStale`/`.lastHeartbeatAt`) — that's
+UI-only, not what enforcement decisions are made from.
 
 **Known bug, found 2026-09-06, not yet fixed:** `SafariEnforcer` has no
 way to tell "the owner disabled the extension to dodge blocking" apart

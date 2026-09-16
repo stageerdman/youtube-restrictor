@@ -15,7 +15,7 @@ const SOCKET_PATH = require("../src/socket-path");
 
 const TEST_BLOCKLIST_UPDATE = {
   type: "blocklist-update",
-  version: "0.1.0",
+  version: "0.2.0",
   timestamp: Date.now(),
   blocklist: {
     channelIds: [],

@@ -74,7 +74,7 @@ final class SafariLocalRelayServer {
                 let json = try? JSONSerialization.jsonObject(with: accumulated) as? [String: Any],
                 json["type"] as? String == "heartbeat"
             {
-                DispatchQueue.main.async { self.heartbeatMonitor.recordHeartbeat() }
+                DispatchQueue.main.async { self.heartbeatMonitor.recordHeartbeat(source: "safari") }
             }
             self.respond(on: connection)
         }

@@ -23,7 +23,7 @@
   const HOST_NAME = "com.stage_ria.ytrestrictor";
   const HEARTBEAT_ALARM_NAME = "yt-restrictor-heartbeat";
   const HEARTBEAT_INTERVAL_MINUTES = 1;
-  const PROTOCOL_VERSION = "0.1.0";
+  const PROTOCOL_VERSION = "0.2.0";
 
   const supportsConnectNative =
     typeof ytRestrictorRuntime.runtime.connectNative === "function";

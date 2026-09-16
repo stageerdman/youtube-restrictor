@@ -9,7 +9,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST_SCRIPT="$REPO_ROOT/native-host/host.js"
 WRAPPER_TEMPLATE="$REPO_ROOT/native-host/manifest/run-host.template.sh"
-WRAPPER_SCRIPT="$REPO_ROOT/native-host/manifest/run-host.sh"
+WRAPPER_SCRIPT="$REPO_ROOT/native-host/manifest/run-host-firefox.sh"
 MANIFEST_TEMPLATE="$REPO_ROOT/native-host/manifest/host-manifest.template.json"
 TARGET_DIR="$HOME/Library/Application Support/Mozilla/NativeMessagingHosts"
 TARGET_FILE="$TARGET_DIR/com.stage_ria.ytrestrictor.json"
@@ -26,9 +26,13 @@ chmod +x "$HOST_SCRIPT"
 # host.js's own `#!/usr/bin/env node` shebang can't be trusted to find
 # node (e.g. Homebrew's /opt/homebrew/bin often isn't on a GUI app's
 # PATH). This wrapper hardcodes the exact node path resolved just above.
+# "firefox" here tags every heartbeat this wrapper forwards so the app
+# can tell Zen's heartbeat apart from Chrome's/Brave's — see
+# native-host/host.js's comment and HeartbeatMonitor.swift.
 sed \
   -e "s#__NODE_PATH__#$NODE_PATH#" \
   -e "s#__HOST_JS_PATH__#$HOST_SCRIPT#" \
+  -e "s#__BROWSER_SOURCE__#firefox#" \
   "$WRAPPER_TEMPLATE" > "$WRAPPER_SCRIPT"
 chmod +x "$WRAPPER_SCRIPT"
 

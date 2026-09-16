@@ -19,7 +19,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST_SCRIPT="$REPO_ROOT/native-host/host.js"
 WRAPPER_TEMPLATE="$REPO_ROOT/native-host/manifest/run-host.template.sh"
-WRAPPER_SCRIPT="$REPO_ROOT/native-host/manifest/run-host.sh"
+WRAPPER_SCRIPT="$REPO_ROOT/native-host/manifest/run-host-chrome.sh"
 MANIFEST_TEMPLATE="$REPO_ROOT/native-host/manifest/host-manifest-chrome.template.json"
 TARGET_DIR="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
 TARGET_FILE="$TARGET_DIR/com.stage_ria.ytrestrictor.json"
@@ -49,10 +49,13 @@ chmod +x "$HOST_SCRIPT"
 
 # Same wrapper-script rationale as install-native-host.sh: Chrome also
 # spawns native-messaging hosts with a minimal environment, so host.js's
-# own shebang can't be trusted to find node.
+# own shebang can't be trusted to find node. "chrome" here tags every
+# heartbeat this wrapper forwards — see native-host/host.js's comment
+# and HeartbeatMonitor.swift.
 sed \
   -e "s#__NODE_PATH__#$NODE_PATH#" \
   -e "s#__HOST_JS_PATH__#$HOST_SCRIPT#" \
+  -e "s#__BROWSER_SOURCE__#chrome#" \
   "$WRAPPER_TEMPLATE" > "$WRAPPER_SCRIPT"
 chmod +x "$WRAPPER_SCRIPT"
 

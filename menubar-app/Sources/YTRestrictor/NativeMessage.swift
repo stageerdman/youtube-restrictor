@@ -3,7 +3,7 @@ import Foundation
 /// Mirrors docs/PROTOCOL.md's message shapes. This app is the socket
 /// *server*; native-host/ (spawned per Firefox session) is the client.
 enum NativeMessage {
-    static let protocolVersion = "0.1.0"
+    static let protocolVersion = "0.2.0"
 
     static func blocklistUpdate(_ blocklist: Blocklist) -> [String: Any] {
         [

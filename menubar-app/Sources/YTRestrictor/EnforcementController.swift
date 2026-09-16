@@ -1,16 +1,15 @@
 import Foundation
 
 /// Ties HeartbeatMonitor (state) to FirefoxEnforcer/SafariEnforcer/
-/// ChromeEnforcer (action): every checkIntervalSeconds, if a browser is
-/// running and the heartbeat has gone stale, quit it. No heartbeat
-/// tracking or browser-process code of its own — just the periodic
-/// "check each, act" loop.
+/// ChromeEnforcer (action): every checkIntervalSeconds, for each
+/// browser that's running, if *that browser's own* heartbeat has gone
+/// stale, quit it. No heartbeat tracking or browser-process code of its
+/// own — just the periodic "check each, act" loop.
 ///
-/// Known limitation, see docs/HOW-IT-WORKS.md's heartbeat section:
-/// heartbeatMonitor is a single shared "last heartbeat from any source"
-/// timestamp, not one per browser, so a live heartbeat from one browser
-/// can mask a dead one from another open at the same time. Not fixed
-/// here — out of scope for adding Safari support.
+/// Checks each browser against its own source's staleness
+/// (`heartbeatMonitor.isStale(source:)`), not a single shared timestamp
+/// — see HeartbeatMonitor's doc comment for why that used to let one
+/// browser's live heartbeat mask another's going silent.
 final class EnforcementController {
     private static let checkIntervalSeconds: TimeInterval = 30
 
@@ -27,15 +26,17 @@ final class EnforcementController {
     }
 
     private func check() {
-        guard heartbeatMonitor.isStale else { return }
-        if FirefoxEnforcer.isFirefoxRunning() {
+        if FirefoxEnforcer.isFirefoxRunning(), heartbeatMonitor.isStale(source: "firefox") {
             FirefoxEnforcer.quitFirefox()
         }
-        if SafariEnforcer.isSafariRunning() {
+        if SafariEnforcer.isSafariRunning(), heartbeatMonitor.isStale(source: "safari") {
             SafariEnforcer.quitSafari()
         }
         for app in ChromeEnforcer.runningChromiumBrowsers() {
-            ChromeEnforcer.quit(app)
+            let source = app.bundleIdentifier == "com.brave.Browser" ? "brave" : "chrome"
+            if heartbeatMonitor.isStale(source: source) {
+                ChromeEnforcer.quit(app)
+            }
         }
     }
 }
