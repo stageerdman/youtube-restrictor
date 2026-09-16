@@ -259,10 +259,12 @@ no code differences at all. It needs its own native-messaging host
 registration only because Brave keeps its own `NativeMessagingHosts`
 directory that doesn't read Chrome's (see "Where state actually lives"
 below) — `scripts/install-native-host-brave.sh` handles that, and
-`com.brave.Browser` is in `supportedBundleIdentifiers` above. Before
-that script has been run and the extension loaded, a running Brave
-looks exactly like any other unsupported browser to the mechanism
-above and gets quit — that's expected, not a bug.
+`com.brave.Browser` is in `supportedBundleIdentifiers` above
+unconditionally (membership is by bundle ID, not by "has the install
+script actually been run yet"). That means a freshly-downloaded Brave,
+before the extension is loaded and checking in, is *not* caught by the
+"no extension yet" mechanism above — it falls through to the heartbeat-
+staleness path instead (see below), the same as Chrome.
 
 ## The heartbeat, and why it exists
 
@@ -275,13 +277,13 @@ four browsers' transports alike. If Zen is running and 5 minutes pass
 with no heartbeat, `EnforcementController` quits Zen via
 `FirefoxEnforcer`; the same check runs for Safari via `SafariEnforcer`
 (bundle identifier `com.apple.Safari`, quit the same graceful-then-force
-way). This exists so that disabling the extension (rather than
-uninstalling it, which the policy already blocks for Firefox/Zen) 
-doesn't quietly restore unrestricted YouTube access — it forces the
-browser closed instead, which is very noticeable. Chrome and Brave
-still have no enforcement wired up on this axis (heartbeat monitoring,
-yes; quit-on-stale, no) — that gap predates Safari support (and Brave
-support) and is unrelated to either.
+way), and for Chrome/Brave via `ChromeEnforcer` (both bundle
+identifiers, same graceful-then-force way — one enforcer covers both
+since they share `extension-chrome/` and its heartbeat). This exists so
+that disabling the extension (rather than uninstalling it, which the
+policy already blocks for Firefox/Zen) doesn't quietly restore
+unrestricted YouTube access — it forces the browser closed instead,
+which is very noticeable.
 
 This is *not* configurable from the UI (no stepper, unlike the removal
 delay) — see `INIT.md` Phase 5. If that's ever revisited, treat it as a

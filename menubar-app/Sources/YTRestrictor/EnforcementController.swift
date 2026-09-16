@@ -1,9 +1,10 @@
 import Foundation
 
-/// Ties HeartbeatMonitor (state) to FirefoxEnforcer/SafariEnforcer
-/// (action): every checkIntervalSeconds, if a browser is running and the
-/// heartbeat has gone stale, quit it. No heartbeat tracking or browser-
-/// process code of its own — just the periodic "check each, act" loop.
+/// Ties HeartbeatMonitor (state) to FirefoxEnforcer/SafariEnforcer/
+/// ChromeEnforcer (action): every checkIntervalSeconds, if a browser is
+/// running and the heartbeat has gone stale, quit it. No heartbeat
+/// tracking or browser-process code of its own — just the periodic
+/// "check each, act" loop.
 ///
 /// Known limitation, see docs/HOW-IT-WORKS.md's heartbeat section:
 /// heartbeatMonitor is a single shared "last heartbeat from any source"
@@ -32,6 +33,9 @@ final class EnforcementController {
         }
         if SafariEnforcer.isSafariRunning() {
             SafariEnforcer.quitSafari()
+        }
+        for app in ChromeEnforcer.runningChromiumBrowsers() {
+            ChromeEnforcer.quit(app)
         }
     }
 }
