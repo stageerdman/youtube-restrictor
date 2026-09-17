@@ -21,6 +21,7 @@
     {
       "matches": ["<all_urls>"],
       "exclude_matches": ["*://*.youtube.com/*", "*://youtu.be/*"],
+      "all_frames": true,
       "js": [
         "src/runtime-shim.js",
         "src/notify/console-log.js",
