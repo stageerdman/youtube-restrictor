@@ -59,15 +59,43 @@
     return document.title.replace(/ - YouTube$/, "");
   }
 
-  function detectAndReport() {
+  async function detectAndReport() {
     const videoId = extractVideoId(location.href);
     if (!videoId) return;
+
+    const channelId = extractChannelId();
+    let channelName = extractChannelName();
+    let title = extractTitle();
+
+    // Bare /embed/ pages (as opposed to a full watch page — this fires
+    // there too now that this content script runs in every frame, not
+    // just a tab's top frame, so it can see third-party sites' embedded
+    // players) ship a stripped-down shell that never populates
+    // ytInitialData/ytInitialPlayerResponse, so the DOM extraction above
+    // always comes back empty here. Fall back to oEmbed, same as
+    // cross-origin <iframe> embeds — see detect/embed-scan.js.
+    if (location.pathname.startsWith("/embed/") && !channelName) {
+      let metadata = null;
+      try {
+        metadata = await ytRestrictorRuntime.runtime.sendMessage({
+          type: "resolve-embed-metadata",
+          videoId,
+        });
+      } catch (err) {
+        // background unreachable — proceed with videoId-only matching
+      }
+      if (metadata) {
+        channelName = metadata.channelName;
+        title = metadata.title;
+      }
+    }
+
     window.ytRestrictorReport.reportDetection({
       surface: "native",
       videoId,
-      channelId: extractChannelId(),
-      channelName: extractChannelName(),
-      title: extractTitle(),
+      channelId,
+      channelName,
+      title,
       url: location.href,
     });
   }
