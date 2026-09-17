@@ -26,7 +26,7 @@ if [ ! -d "$APP_BUNDLE" ]; then
 fi
 
 "$REPO_ROOT/scripts/package-extension-xpi.sh"
-XPI_PATH="$REPO_ROOT/extension/build/youtube-restrictor.xpi"
+XPI_PATH="$REPO_ROOT/extension-firefox/build/youtube-restrictor.xpi"
 
 mkdir -p "$DISTRIBUTION_DIR"
 sed \
