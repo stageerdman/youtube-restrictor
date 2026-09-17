@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "YouTube Restrictor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Personal self-control tool: detects YouTube playback (native pages and third-party embeds) and blocks it against an owner-defined blocklist.",
   "content_scripts": [
     {
