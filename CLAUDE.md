@@ -4,6 +4,14 @@ Operating instructions for any agent working in this repository. Read
 `INIT.md` first for project context. This file governs *how* to work, not
 *what* to build.
 
+> This project is under **AI Control** (`.project` marker). This CLAUDE.md is
+> compiled preservation-first from the global modules
+> (`~/.ai-control/modules/`: STRUCTURE, CODING, WORKFLOW, UX) merged with the
+> project-specific rules below — the bespoke rules win where they overlap. To
+> refresh it from the modules, use the `rebuild-claude-md` routine (it keeps
+> the local rules). The "Working standard" section just below carries the
+> global-module guidance; everything after it is project-specific.
+
 ## Core principles
 
 1. **Modularity above all.** Three components, three clean boundaries, no
@@ -87,14 +95,51 @@ Operating instructions for any agent working in this repository. Read
    anything else covered by the general "check before risky actions"
    guidance still needs confirmation as normal.
 
+## Working standard (from AI Control global modules)
+
+This folds in the global-module guidance not already covered by the
+project-specific rules above. Where this and a rule below overlap, the rule
+below wins.
+
+- **Phased roadmaps + `updates/` tracking.** Any non-trivial update or task
+  starts with a roadmap broken into phases, designed before writing code and
+  recorded in an update folder: `updates/YYYY-MM-DD NAME - OPEN/` (flip to
+  `- CLOSED/` when done), containing `update vX.md` (goal, phases, live
+  status) and `wiki.md` (durable decisions/lessons). Most phases end with
+  tests that lock in what they built. Keep `issues.txt` current for known
+  issues and TODOs.
+- **Research spikes.** For a new API, unfamiliar library, or genuinely new
+  design, do a throwaway spike *outside the main code*, inside the update
+  folder, to find out what actually works first. Capture findings in that
+  update's `wiki.md`.
+- **Act as an orchestrator.** Prefer delegating to focused agents over doing
+  everything inline — decompose, fan out in parallel, synthesize.
+- **Always bring in UX experts.** For anything with a user-facing surface
+  (the SwiftUI menu-bar app, the extensions' block/placeholder UI), launch a
+  dedicated UX-expert agent — several in parallel for multi-part surfaces —
+  to think the experience through. Cut everything unnecessary (Steve-Jobs
+  style: every element must earn its place); keep a minimal visual system
+  (few fonts/colors/sizes); build reusable, standardized, isolated
+  components; responsive and accessible by default.
+- **Keep it minimal; test what matters.** Build only what's truly needed; add
+  abstraction when a real need shows up, not on speculation. Cover core
+  logic, risky paths, and anything that would silently regress — skip tests
+  for trivial glue.
+- **Verify by running the actual thing**, not by trusting a green test —
+  confirm the change does what it set out to do before committing (this
+  complements the build+report protocol below).
+
 ## Repo layout (expected top-level structure)
 
 ```
 .
+├── .project                 # AI Control marker (modules, secrets, claude_md_generated)
 ├── INIT.md
 ├── CLAUDE.md
 ├── README.md
 ├── .gitignore
+├── issues.txt               # running list of known issues / TODOs
+├── updates/                 # one folder per update (see AI Control STRUCTURE.md)
 ├── docs/
 │   ├── PROTOCOL.md          # message schema, versioned (native-messaging JSON
 │   │                        # for Firefox/Chrome, loopback TCP relay for Safari)
